@@ -47,190 +47,260 @@ class DrawingScene extends Phaser.Scene {
     }
 
     createUI() {
-        // Modern title with gradient effect simulation
-        this.titleText = this.add.text(400, 40, 'Draw Your Fighter!', {
-            fontSize: '36px',
-            fill: '#4CAF50',
-            fontFamily: 'Arial',
+        // Get screen dimensions
+        const centerX = this.cameras.main.centerX;
+        const centerY = this.cameras.main.centerY;
+        
+        // Doodly title with hand-drawn feel
+        this.titleText = this.add.text(centerX, 40, 'Draw Your Fighter!', {
+            fontSize: '42px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Subtitle with better spacing
-        this.statusText = this.add.text(400, 80, 'Create your unique fighter by drawing on the canvas', {
+        // Add a doodly underline
+        this.add.line(centerX, 65, -150, 0, 150, 0, 0x2c3e50)
+            .setLineWidth(3, 3);
+
+        // Subtitle with paper-like styling
+        this.statusText = this.add.text(centerX, 90, 'Grab your pencil and sketch your warrior on paper!', {
             fontSize: '16px',
-            fill: '#e0e0e0',
-            fontFamily: 'Arial'
+            fill: '#555555',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'italic'
         }).setOrigin(0.5);
 
-        // Room info with modern styling
+        // Room info with paper note styling
         const gameState = this.gameManager ? this.gameManager.getGameState() : null;
         if (gameState && gameState.roomCode) {
-            // Room code with background
-            const roomBg = this.add.rectangle(400, 115, 150, 25, 0x2c2c2c);
-            roomBg.setStrokeStyle(1, 0x4CAF50);
+            // Paper note background - clickable
+            const roomBg = this.add.rectangle(centerX, 125, 160, 30, 0xfff9c4);
+            roomBg.setStrokeStyle(2, 0xe0e0e0);
+            roomBg.angle = -1; // Slight tilt for hand-drawn feel
+            roomBg.setInteractive({ useHandCursor: true });
             
-            this.roomText = this.add.text(400, 115, `Room: ${gameState.roomCode}`, {
+            this.roomText = this.add.text(centerX, 125, `📋 Room: ${gameState.roomCode}`, {
                 fontSize: '14px',
-                fill: '#4CAF50',
-                fontFamily: 'Arial',
+                fill: '#333333',
+                fontFamily: 'Comic Sans MS, cursive, sans-serif',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
+            
+            // Make room text clickable too
+            this.roomText.setInteractive({ useHandCursor: true });
+            
+            // Add click-to-copy functionality
+            const copyRoomCode = () => {
+                this.copyToClipboard(gameState.roomCode);
+                this.showCopyFeedback(centerX, 125);
+            };
+            
+            roomBg.on('pointerdown', copyRoomCode);
+            this.roomText.on('pointerdown', copyRoomCode);
+            
+            // Add hover effects
+            const hoverIn = () => {
+                roomBg.setFillStyle(0xfff5b7);
+                this.roomText.setFill('#2c3e50');
+            };
+            
+            const hoverOut = () => {
+                roomBg.setFillStyle(0xfff9c4);
+                this.roomText.setFill('#333333');
+            };
+            
+            roomBg.on('pointerover', hoverIn);
+            roomBg.on('pointerout', hoverOut);
+            this.roomText.on('pointerover', hoverIn);
+            this.roomText.on('pointerout', hoverOut);
         }
 
-        // Add canvas area indicator
-        this.add.text(400, 150, '⬇ Draw Here ⬇', {
+        // Doodly arrow pointing to canvas
+        this.add.text(centerX, 165, '↓ Your drawing pad ↓', {
             fontSize: '14px',
-            fill: '#888888',
-            fontFamily: 'Arial'
+            fill: '#777777',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif'
         }).setOrigin(0.5);
 
         // HTML canvas will be added in initializeDrawingCanvas()
     }
 
     initializeDrawingCanvas() {
-        // Create drawing canvas instance (slightly smaller for better fit)
-        this.drawingCanvas = new DrawingCanvas(380, 320);
+        // Create drawing canvas with paper-like dimensions
+        this.drawingCanvas = new DrawingCanvas(400, 300);
         
-        // Modern, centered canvas styling
+        // Paper-like canvas styling
         const canvas = this.drawingCanvas.getCanvas();
         canvas.style.position = 'absolute';
         canvas.style.left = '50%';
-        canvas.style.top = '280px';
-        canvas.style.transform = 'translateX(-50%)'; // Perfect centering
+        canvas.style.top = '290px';
+        canvas.style.transform = 'translateX(-50%) rotate(-0.5deg)'; // Slight paper tilt
         canvas.style.zIndex = '5';
         canvas.style.backgroundColor = '#ffffff';
-        canvas.style.borderRadius = '12px';
-        canvas.style.border = '3px solid #4CAF50';
-        canvas.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3), 0 4px 8px rgba(76,175,80,0.2)';
+        canvas.style.borderRadius = '0px'; // Sharp corners like real paper
+        canvas.style.border = 'none';
+        canvas.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1), 0 0 0 1px #e0e0e0'; // Paper shadow
         canvas.style.display = 'block';
-        canvas.style.cursor = 'crosshair';
+        canvas.style.cursor = 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTdMMTcgM0wyMSA3TDcgMjFIM1YxN1oiIHN0cm9rZT0iIzMzMzMzMyIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+") 12 12, auto'; // Pencil cursor
         
-        // Add subtle animation on hover
+        // Add paper texture with subtle grid lines
+        const paperOverlay = document.createElement('div');
+        paperOverlay.style.position = 'absolute';
+        paperOverlay.style.left = '50%';
+        paperOverlay.style.top = '290px';
+        paperOverlay.style.transform = 'translateX(-50%) rotate(-0.5deg)';
+        paperOverlay.style.width = '400px';
+        paperOverlay.style.height = '300px';
+        paperOverlay.style.backgroundColor = 'transparent';
+        paperOverlay.style.backgroundImage = `
+            linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)
+        `;
+        paperOverlay.style.backgroundSize = '20px 20px';
+        paperOverlay.style.pointerEvents = 'none';
+        paperOverlay.style.zIndex = '6';
+        
+        // Add subtle hover effect for paper
         canvas.addEventListener('mouseenter', () => {
-            canvas.style.transform = 'translateX(-50%) scale(1.02)';
-            canvas.style.transition = 'transform 0.2s ease';
+            canvas.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15), 0 0 0 1px #d0d0d0';
+            canvas.style.transition = 'box-shadow 0.2s ease';
         });
         
         canvas.addEventListener('mouseleave', () => {
-            canvas.style.transform = 'translateX(-50%) scale(1)';
+            canvas.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1), 0 0 0 1px #e0e0e0';
         });
         
-        // Add canvas to the DOM
+        // Add both canvas and overlay to DOM
         document.body.appendChild(canvas);
+        document.body.appendChild(paperOverlay);
         
-        console.log('Modern drawing canvas initialized and centered');
+        console.log('Paper-like drawing canvas initialized');
     }
 
     createDrawingTools() {
-        const toolY = 200; // Move tools to the left side of canvas
+        const toolY = 220;
+        const leftToolX = Math.min(120, this.cameras.main.width * 0.1); // 10% from left edge or 120px max
+        const rightToolX = Math.max(this.cameras.main.width - 120, this.cameras.main.width * 0.9); // 10% from right edge
         
-        // Tools section header
-        this.add.text(120, toolY - 30, 'Drawing Tools', {
-            fontSize: '16px',
-            fill: '#4CAF50',
-            fontFamily: 'Arial',
+        // Pencil case header (left side)
+        this.add.text(leftToolX, toolY - 30, 'Pencil Case', {
+            fontSize: '18px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Tool selection buttons (vertical layout)
-        this.toolButtons.brush = this.add.rectangle(120, toolY, 80, 35, 0x4CAF50)
+        // Hand-drawn style tool buttons
+        this.toolButtons.brush = this.add.rectangle(leftToolX, toolY, 85, 30, 0xf39c12)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.selectTool('brush'))
-            .on('pointerover', () => this.toolButtons.brush.setFillStyle(0x45a049))
+            .on('pointerover', () => this.toolButtons.brush.setFillStyle(0xe67e22))
             .on('pointerout', () => this.selectTool(this.currentTool));
+        this.toolButtons.brush.setStrokeStyle(2, 0x2c3e50);
         
-        this.add.text(120, toolY, '🖌️ Brush', {
-            fontSize: '12px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        this.toolButtons.eraser = this.add.rectangle(120, toolY + 45, 80, 35, 0x666666)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.selectTool('eraser'))
-            .on('pointerover', () => this.toolButtons.eraser.setFillStyle(0x777777))
-            .on('pointerout', () => this.selectTool(this.currentTool));
-        
-        this.add.text(120, toolY + 45, '🧽 Eraser', {
-            fontSize: '12px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        // Color palette section
-        this.add.text(120, toolY + 100, 'Colors', {
+        this.add.text(leftToolX, toolY, '✏️ Pencil', {
             fontSize: '14px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#FFFFFF', '#FFA500'];
+        this.toolButtons.eraser = this.add.rectangle(leftToolX, toolY + 40, 85, 30, 0xffc0cb)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.selectTool('eraser'))
+            .on('pointerover', () => this.toolButtons.eraser.setFillStyle(0xffb6c1))
+            .on('pointerout', () => this.selectTool(this.currentTool));
+        this.toolButtons.eraser.setStrokeStyle(2, 0x2c3e50);
+        
+        this.add.text(leftToolX, toolY + 40, '🧹 Eraser', {
+            fontSize: '14px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Crayon box
+        this.add.text(leftToolX, toolY + 90, 'Crayon Box', {
+            fontSize: '16px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        const colors = ['#000000', '#e74c3c', '#27ae60', '#3498db', '#f1c40f', '#9b59b6', '#34495e', '#e67e22'];
         colors.forEach((color, index) => {
             const row = Math.floor(index / 4);
             const col = index % 4;
-            const x = 85 + (col * 20);
-            const y = toolY + 130 + (row * 25);
+            const x = leftToolX - 35 + (col * 18);
+            const y = toolY + 115 + (row * 22);
             
-            this.colorButtons[color] = this.add.rectangle(x, y, 18, 18, parseInt(color.replace('#', '0x')))
+            this.colorButtons[color] = this.add.circle(x, y, 8, parseInt(color.replace('#', '0x')))
                 .setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => this.selectColor(color));
             
-            // Add border for white color visibility
-            if (color === '#FFFFFF') {
-                this.colorButtons[color].setStrokeStyle(1, 0x666666);
-            }
+            this.colorButtons[color].setStrokeStyle(2, 0x2c3e50);
         });
 
-        // Size controls section
-        this.add.text(120, toolY + 190, 'Brush Size', {
-            fontSize: '14px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
+        // Pencil thickness
+        this.add.text(leftToolX, toolY + 165, 'Thickness', {
+            fontSize: '16px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        const sizes = [2, 5, 10, 15];
+        const sizes = [2, 5, 8, 12];
         sizes.forEach((size, index) => {
-            const x = 85 + (index * 20);
-            const button = this.add.rectangle(x, toolY + 215, 18, 18, 0x555555)
+            const x = leftToolX - 50 + (index * 25);
+            const button = this.add.circle(x, toolY + 190, 8, 0xecf0f1)
                 .setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => this.selectSize(size))
-                .on('pointerover', () => button.setFillStyle(0x777777))
-                .on('pointerout', () => button.setFillStyle(0x555555));
+                .on('pointerover', () => button.setFillStyle(0xbdc3c7))
+                .on('pointerout', () => button.setFillStyle(0xecf0f1));
             
-            this.add.text(x, toolY + 215, size.toString(), {
+            button.setStrokeStyle(2, 0x2c3e50);
+            
+            this.add.text(x, toolY + 190, size.toString(), {
                 fontSize: '10px',
-                fill: '#ffffff',
-                fontFamily: 'Arial'
+                fill: '#2c3e50',
+                fontFamily: 'Comic Sans MS, cursive, sans-serif',
+                fontStyle: 'bold'
             }).setOrigin(0.5);
         });
 
-        // Action buttons section (right side of canvas)
-        const actionX = 680;
-        
-        this.clearButton = this.add.rectangle(actionX, toolY + 50, 90, 40, 0xFF5722)
+        // Action buttons (right side) - paper style
+        // Clear button (looks like an eraser)
+        this.clearButton = this.add.rectangle(rightToolX, toolY + 40, 85, 35, 0xe74c3c)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.clearCanvas())
-            .on('pointerover', () => this.clearButton.setFillStyle(0xe64a19))
-            .on('pointerout', () => this.clearButton.setFillStyle(0xFF5722));
+            .on('pointerover', () => this.clearButton.setFillStyle(0xc0392b))
+            .on('pointerout', () => this.clearButton.setFillStyle(0xe74c3c));
+        this.clearButton.setStrokeStyle(2, 0x2c3e50);
+        this.clearButton.angle = 2; // Slight tilt
         
-        this.add.text(actionX, toolY + 50, '🗑️ Clear', {
-            fontSize: '14px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        this.submitButton = this.add.rectangle(actionX, toolY + 100, 90, 45, 0x2196F3)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.submitDrawing())
-            .on('pointerover', () => this.submitButton.setFillStyle(0x1976D2))
-            .on('pointerout', () => this.submitButton.setFillStyle(0x2196F3));
-        
-        this.add.text(actionX, toolY + 100, '✅ Submit\nDrawing', {
+        this.add.text(rightToolX, toolY + 40, '🗑️ Clear\nPaper', {
             fontSize: '12px',
             fill: '#ffffff',
-            fontFamily: 'Arial',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold',
+            align: 'center'
+        }).setOrigin(0.5);
+
+        // Submit button (looks like turning in homework)
+        this.submitButton = this.add.rectangle(rightToolX, toolY + 90, 85, 40, 0x27ae60)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.submitDrawing())
+            .on('pointerover', () => this.submitButton.setFillStyle(0x229954))
+            .on('pointerout', () => this.submitButton.setFillStyle(0x27ae60));
+        this.submitButton.setStrokeStyle(2, 0x2c3e50);
+        this.submitButton.angle = -1; // Slight tilt
+        
+        this.add.text(rightToolX, toolY + 90, '📝 Turn In\nDrawing', {
+            fontSize: '12px',
+            fill: '#ffffff',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold',
             align: 'center'
         }).setOrigin(0.5);
 
@@ -487,6 +557,85 @@ class DrawingScene extends Phaser.Scene {
         if (this.drawingCanvas) {
             const canvas = this.drawingCanvas.getCanvas();
             canvas.style.display = 'none';
+        }
+    }
+
+    copyToClipboard(text) {
+        try {
+            // Modern way using Clipboard API
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    console.log('Room code copied to clipboard:', text);
+                }).catch(err => {
+                    console.error('Failed to copy to clipboard:', err);
+                    this.fallbackCopyToClipboard(text);
+                });
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                this.fallbackCopyToClipboard(text);
+            }
+        } catch (error) {
+            console.error('Copy to clipboard error:', error);
+            this.fallbackCopyToClipboard(text);
+        }
+    }
+
+    fallbackCopyToClipboard(text) {
+        try {
+            // Create temporary textarea element
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+                console.log('Room code copied to clipboard (fallback):', text);
+            } else {
+                console.error('Fallback copy failed');
+            }
+        } catch (err) {
+            console.error('Fallback copy error:', err);
+        }
+    }
+
+    showCopyFeedback(x, y) {
+        // Create a temporary "Copied!" message
+        const feedbackText = this.add.text(x, y - 30, '✅ Copied!', {
+            fontSize: '12px',
+            fill: '#27ae60',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Animate the feedback
+        this.tweens.add({
+            targets: feedbackText,
+            y: y - 50,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                feedbackText.destroy();
+            }
+        });
+
+        // Also briefly highlight the room code background
+        if (this.roomText) {
+            const originalColor = this.roomText.style.color;
+            this.roomText.setFill('#27ae60');
+            
+            this.time.delayedCall(300, () => {
+                if (this.roomText) {
+                    this.roomText.setFill('#333333');
+                }
+            });
         }
     }
 

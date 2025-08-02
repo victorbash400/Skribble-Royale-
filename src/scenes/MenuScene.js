@@ -19,26 +19,35 @@ class MenuScene extends Phaser.Scene {
         // Get reference to GameManager
         this.gameManager = window.gameManager;
         
-        // Title
-        this.add.text(400, 80, 'Scribble Royale', {
-            fontSize: '48px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
+        // Get screen dimensions
+        const centerX = this.cameras.main.centerX;
+        const centerY = this.cameras.main.centerY;
+        
+        // Doodly title
+        this.add.text(centerX, centerY - 200, 'Scribble Royale', {
+            fontSize: '52px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Subtitle
-        this.add.text(400, 130, 'Draw your fighter and battle!', {
-            fontSize: '18px',
-            fill: '#cccccc',
-            fontFamily: 'Arial'
+        // Add doodly underline for title
+        this.add.line(centerX, centerY - 170, -180, 0, 180, 0, 0x2c3e50)
+            .setLineWidth(4, 4);
+
+        // Subtitle with paper styling
+        this.add.text(centerX, centerY - 140, 'Draw your fighter and battle!', {
+            fontSize: '20px',
+            fill: '#555555',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'italic'
         }).setOrigin(0.5);
 
-        // Connection status display
-        this.connectionText = this.add.text(400, 170, 'Connecting...', {
+        // Connection status with paper note style
+        this.connectionText = this.add.text(centerX, centerY - 110, 'Connecting...', {
             fontSize: '14px',
-            fill: '#ffff00',
-            fontFamily: 'Arial'
+            fill: '#e67e22',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif'
         }).setOrigin(0.5);
 
         this.createRoomUI();
@@ -46,80 +55,96 @@ class MenuScene extends Phaser.Scene {
     }
 
     createRoomUI() {
-        // Create Room Section
-        this.add.text(300, 220, 'Create New Room', {
-            fontSize: '20px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
+        // Get screen dimensions
+        const centerX = this.cameras.main.centerX;
+        const centerY = this.cameras.main.centerY;
+        
+        // Create Room Section with doodly style
+        this.add.text(centerX - 100, centerY - 60, 'Create New Room', {
+            fontSize: '22px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        const createButton = this.add.rectangle(300, 260, 180, 40, 0x4CAF50)
+        const createButton = this.add.rectangle(centerX - 100, centerY - 20, 180, 45, 0x27ae60)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.createRoom())
-            .on('pointerover', () => createButton.setFillStyle(0x45a049))
-            .on('pointerout', () => createButton.setFillStyle(0x4CAF50));
+            .on('pointerover', () => createButton.setFillStyle(0x229954))
+            .on('pointerout', () => createButton.setFillStyle(0x27ae60));
+        createButton.setStrokeStyle(3, 0x2c3e50);
+        createButton.angle = 1; // Slight tilt
 
-        this.add.text(300, 260, 'Create Room', {
+        this.add.text(centerX - 100, centerY - 20, '🏠 Create Room', {
             fontSize: '16px',
             fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        // Join Room Section  
-        this.add.text(500, 220, 'Join Existing Room', {
-            fontSize: '20px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        const joinButton = this.add.rectangle(500, 260, 180, 40, 0x2196F3)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.joinRoom())
-            .on('pointerover', () => joinButton.setFillStyle(0x1976D2))
-            .on('pointerout', () => joinButton.setFillStyle(0x2196F3));
-
-        this.add.text(500, 260, 'Join Room', {
-            fontSize: '16px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
+        // Join Room Section with doodly style
+        this.add.text(centerX + 100, centerY - 60, 'Join Existing Room', {
+            fontSize: '22px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Separator line
-        this.add.line(400, 320, 0, 0, 600, 0, 0x666666);
+        const joinButton = this.add.rectangle(centerX + 100, centerY - 20, 180, 45, 0x3498db)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.joinRoom())
+            .on('pointerover', () => joinButton.setFillStyle(0x2980b9))
+            .on('pointerout', () => joinButton.setFillStyle(0x3498db));
+        joinButton.setStrokeStyle(3, 0x2c3e50);
+        joinButton.angle = -1; // Slight tilt
 
-        // Enter Room Code Section (completely separate)
-        this.add.text(400, 350, 'Enter Room Code', {
-            fontSize: '18px',
+        this.add.text(centerX + 100, centerY - 20, '🚪 Join Room', {
+            fontSize: '16px',
             fill: '#ffffff',
-            fontFamily: 'Arial',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Doodly separator line
+        this.add.line(centerX, centerY + 40, -250, 0, 250, 0, 0x95a5a6)
+            .setLineWidth(2, 2);
+
+        // Enter Room Code Section (paper note style)
+        const codeNoteBg = this.add.rectangle(centerX, centerY + 100, 300, 80, 0xfff9c4);
+        codeNoteBg.setStrokeStyle(2, 0xe0e0e0);
+        codeNoteBg.angle = -0.5;
+
+        this.add.text(centerX, centerY + 70, 'Got a Room Code?', {
+            fontSize: '18px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         // Room code input field (HTML element)
         this.createRoomCodeInput();
 
-        // Room code display (for created rooms)
-        this.roomCodeDisplay = this.add.text(400, 420, '', {
+        // Room code display (for created rooms) - clickable
+        this.roomCodeDisplay = this.add.text(centerX, centerY + 160, '', {
             fontSize: '18px',
-            fill: '#00ff00',
-            fontFamily: 'Arial',
+            fill: '#27ae60',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         // Status message
-        this.statusMessage = this.add.text(400, 460, '', {
+        this.statusMessage = this.add.text(centerX, centerY + 200, '', {
             fontSize: '14px',
-            fill: '#ffff00',
-            fontFamily: 'Arial'
+            fill: '#e67e22',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif'
         }).setOrigin(0.5);
 
-        // Instructions
-        this.add.text(400, 500, 'Share the room code with your opponent to start playing!', {
-            fontSize: '12px',
-            fill: '#888888',
-            fontFamily: 'Arial'
+        // Instructions with doodly styling
+        this.add.text(centerX, centerY + 240, 'Share the room code with your friend to start drawing!', {
+            fontSize: '14px',
+            fill: '#7f8c8d',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'italic'
         }).setOrigin(0.5);
     }
 
@@ -130,18 +155,20 @@ class MenuScene extends Phaser.Scene {
         inputElement.placeholder = 'Enter room code';
         inputElement.maxLength = 6;
         inputElement.style.position = 'absolute';
-        inputElement.style.left = '320px';  // Centered below the separator
-        inputElement.style.top = '380px';   // In the separate section
+        inputElement.style.left = '50%';
+        inputElement.style.top = '50%';
+        inputElement.style.transform = 'translate(-50%, 20px)'; // Center and offset down
         inputElement.style.width = '160px';
         inputElement.style.height = '30px';
         inputElement.style.fontSize = '16px';
         inputElement.style.textAlign = 'center';
-        inputElement.style.backgroundColor = '#333333';
-        inputElement.style.color = '#ffffff';
-        inputElement.style.border = '2px solid #666666';
+        inputElement.style.backgroundColor = '#ffffff';
+        inputElement.style.color = '#2c3e50';
+        inputElement.style.border = '2px solid #2c3e50';
         inputElement.style.borderRadius = '4px';
         inputElement.style.outline = 'none';
         inputElement.style.zIndex = '10';
+        inputElement.style.fontFamily = 'Comic Sans MS, cursive, sans-serif';
 
         // Add event listeners
         inputElement.addEventListener('input', (e) => {
@@ -293,13 +320,11 @@ class MenuScene extends Phaser.Scene {
                 this.roomCodeDisplay.setText(`Room Code: ${createdRoomCode}`);
                 this.showStatusMessage('Room created! Starting drawing phase...', '#00ff00');
                 console.log(`Room created and joined: ${createdRoomCode}`);
-                // Automatically transition to drawing scene
-                setTimeout(() => {
-                    if (this.gameManager && this.gameManager.currentScene === 'MenuScene' && !this.isTransitioning) {
-                        this.isTransitioning = true;
-                        this.gameManager.handlePhaseChange('drawing');
-                    }
-                }, 1500);
+                // Instantly transition to drawing scene
+                if (this.gameManager && this.gameManager.currentScene === 'MenuScene' && !this.isTransitioning) {
+                    this.isTransitioning = true;
+                    this.gameManager.handlePhaseChange('drawing');
+                }
                 break;
             case 'room_joined':
                 this.isWaitingForResponse = false;
@@ -307,13 +332,11 @@ class MenuScene extends Phaser.Scene {
                 this.roomCodeDisplay.setText(`Joined Room: ${joinedRoomCode}`);
                 this.showStatusMessage('Successfully joined room! Starting drawing phase...', '#00ff00');
                 console.log(`Joined room: ${joinedRoomCode}`);
-                // Automatically transition to drawing scene
-                setTimeout(() => {
-                    if (this.gameManager && this.gameManager.currentScene === 'MenuScene' && !this.isTransitioning) {
-                        this.isTransitioning = true;
-                        this.gameManager.handlePhaseChange('drawing');
-                    }
-                }, 1500);
+                // Instantly transition to drawing scene
+                if (this.gameManager && this.gameManager.currentScene === 'MenuScene' && !this.isTransitioning) {
+                    this.isTransitioning = true;
+                    this.gameManager.handlePhaseChange('drawing');
+                }
                 break;
             case 'player_joined':
                 if (data.playerId !== this.gameManager.playerId) {

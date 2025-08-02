@@ -8,13 +8,7 @@ class CombatScene extends Phaser.Scene {
         this.fighters = {};
         this.inputHandler = null;
         this.playerFighterId = null; // ID of the fighter controlled by this player
-        this.arena = {
-            width: 800,
-            height: 600,
-            groundY: 500,
-            leftSpawnX: 150,
-            rightSpawnX: 650
-        };
+        // Arena will be set up dynamically in create()
         this.ground = null;
         this.walls = [];
         this.fightersLoaded = false;
@@ -29,6 +23,15 @@ class CombatScene extends Phaser.Scene {
 
         // Get reference to GameManager
         this.gameManager = window.gameManager;
+
+        // Set up arena dimensions based on screen size
+        this.arena = {
+            width: this.cameras.main.width,
+            height: this.cameras.main.height,
+            groundY: this.cameras.main.height - 100,
+            leftSpawnX: this.cameras.main.width * 0.2,
+            rightSpawnX: this.cameras.main.width * 0.8
+        };
 
         // Initialize input handler
         this.setupInputHandler();
@@ -80,50 +83,85 @@ class CombatScene extends Phaser.Scene {
      * Create the combat arena with ground and boundaries
      */
     createArena() {
-        // Create background
-        this.add.rectangle(400, 300, 800, 600, 0x001122);
+        // Paper-like background that fills the screen
+        this.add.rectangle(this.cameras.main.centerX, this.cameras.main.centerY, this.arena.width, this.arena.height, 0xf8f8f8);
 
-        // Create ground
-        this.ground = this.add.rectangle(400, this.arena.groundY, this.arena.width, 20, 0x4a4a4a);
+        // Hand-drawn style ground
+        this.ground = this.add.rectangle(this.cameras.main.centerX, this.arena.groundY, this.arena.width, 15, 0x8b4513);
+        this.ground.setStrokeStyle(2, 0x654321);
         this.physics.add.existing(this.ground, true); // Static body
 
         // Create side walls (invisible collision boundaries)
-        const leftWall = this.add.rectangle(0, 300, 20, 600, 0x000000, 0);
-        const rightWall = this.add.rectangle(800, 300, 20, 600, 0x000000, 0);
+        const leftWall = this.add.rectangle(0, this.cameras.main.centerY, 20, this.arena.height, 0x000000, 0);
+        const rightWall = this.add.rectangle(this.arena.width, this.cameras.main.centerY, 20, this.arena.height, 0x000000, 0);
 
         this.physics.add.existing(leftWall, true);
         this.physics.add.existing(rightWall, true);
 
         this.walls = [leftWall, rightWall];
 
-        // Add arena decorations
-        this.add.text(400, 50, 'COMBAT ARENA', {
-            fontSize: '32px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
-            stroke: '#000000',
-            strokeThickness: 2
+        // Doodly title
+        this.add.text(this.cameras.main.centerX, 50, 'Battle Arena!', {
+            fontSize: '36px',
+            fill: '#2c3e50',
+            fontFamily: 'Comic Sans MS, cursive, sans-serif',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
+
+        // Add doodly underline
+        this.add.line(this.cameras.main.centerX, 75, -120, 0, 120, 0, 0x2c3e50)
+            .setLineWidth(3, 3);
+
+        // Draw some paper-style decorations (clouds, sun, grass)
+        // Simple cloud doodles positioned relative to screen width
+        const cloudY = 120;
+        this.drawDoodleCloud(this.arena.width * 0.2, cloudY);
+        this.drawDoodleCloud(this.arena.width * 0.8, cloudY);
         
-        // TEST BUTTON - manually trigger game over
-        const testButton = this.add.rectangle(700, 100, 100, 40, 0xff0000)
-            .setInteractive()
-            .on('pointerdown', () => {
-                console.log('🧪 MANUAL GAME OVER TEST');
-                this.handleServerGameOver({
-                    data: {
-                        winner: this.gameManager?.playerId,
-                        defeatedPlayer: 'test_player',
-                        finalHealth: {},
-                        gameStats: { duration: 30000 }
-                    }
-                });
-            });
+        // Simple sun
+        this.drawDoodleSun(this.arena.width * 0.9, 150);
 
-        // Add ground line visual
-        this.add.line(400, this.arena.groundY - 10, 0, 0, this.arena.width, 0, 0x666666);
+        // Grass tufts along the ground
+        for (let i = 50; i < this.arena.width - 50; i += 60) {
+            this.drawGrassTuft(i, this.arena.groundY - 8);
+        }
 
-        console.log('Arena created');
+        console.log('Doodle arena created');
+    }
+
+    drawDoodleCloud(x, y) {
+        // Simple cloud with circles
+        const cloud1 = this.add.circle(x - 15, y, 12, 0xecf0f1);
+        const cloud2 = this.add.circle(x, y - 5, 15, 0xecf0f1);
+        const cloud3 = this.add.circle(x + 15, y, 12, 0xecf0f1);
+        
+        cloud1.setStrokeStyle(2, 0x95a5a6);
+        cloud2.setStrokeStyle(2, 0x95a5a6);
+        cloud3.setStrokeStyle(2, 0x95a5a6);
+    }
+
+    drawDoodleSun(x, y) {
+        // Simple sun with rays
+        const sun = this.add.circle(x, y, 20, 0xf1c40f);
+        sun.setStrokeStyle(2, 0xf39c12);
+        
+        // Sun rays
+        for (let i = 0; i < 8; i++) {
+            const angle = (i * 45) * Math.PI / 180;
+            const rayX = x + Math.cos(angle) * 30;
+            const rayY = y + Math.sin(angle) * 30;
+            const ray = this.add.line(x, y, 0, 0, rayX - x, rayY - y, 0xf39c12);
+            ray.setLineWidth(2, 2);
+        }
+    }
+
+    drawGrassTuft(x, y) {
+        // Simple grass tuft
+        for (let i = 0; i < 3; i++) {
+            const grassX = x + (i - 1) * 3;
+            const grass = this.add.line(grassX, y, 0, 0, Math.random() * 4 - 2, -8 - Math.random() * 4, 0x27ae60);
+            grass.setLineWidth(2, 2);
+        }
     }
 
     /**
@@ -900,82 +938,38 @@ class CombatScene extends Phaser.Scene {
                 });
             }
         
-        // Create game over overlay
-        const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.8);
-        
-        // Display winner announcement
-        if (winner) {
-            const winnerName = winner.substring(7, 13); // Extract readable part of player ID
-            const isWinner = winner === this.gameManager?.playerId;
-            
-            this.add.text(400, 200, `🏆 ${winnerName} WINS!`, {
-                fontSize: '40px',
-                fill: isWinner ? '#00ff00' : '#ffff00',
-                fontFamily: 'Arial',
-                stroke: '#000000',
-                strokeThickness: 4
-            }).setOrigin(0.5);
-            
-            // Add celebration effect for winner
-            if (isWinner) {
-                this.add.text(400, 250, 'VICTORY!', {
-                    fontSize: '24px',
-                    fill: '#00ff00',
-                    fontFamily: 'Arial'
-                }).setOrigin(0.5);
-            } else {
-                this.add.text(400, 250, 'DEFEAT', {
-                    fontSize: '24px',
-                    fill: '#ff6666',
-                    fontFamily: 'Arial'
-                }).setOrigin(0.5);
-            }
-        } else {
-            this.add.text(400, 200, '🤝 DRAW!', {
-                fontSize: '40px',
-                fill: '#ffffff',
-                fontFamily: 'Arial',
-                stroke: '#000000',
-                strokeThickness: 4
-            }).setOrigin(0.5);
+        // Prepare game result data for ResultsScene
+        const gameResult = {
+            isDraw: !winner,
+            isLocalPlayerWinner: winner === this.gameManager.playerId,
+            winnerId: winner,
+            winnerName: winner === this.gameManager.playerId ? 'You' : `Player ${winner?.slice(-3) || 'Unknown'}`,
+            gameDuration: gameStats?.duration || 0,
+            finalStats: {}
+        };
+
+        // Build final stats for each player
+        if (finalHealth) {
+            Object.keys(finalHealth).forEach(playerId => {
+                const fighter = this.fighters[playerId];
+                const health = finalHealth[playerId];
+                gameResult.finalStats[playerId] = {
+                    finalHealth: health,
+                    maxHealth: fighter?.maxHealth || 100,
+                    healthPercentage: fighter?.maxHealth ? (health / fighter.maxHealth) * 100 : 0,
+                    survived: health > 0
+                };
+            });
         }
-        
-        // Add game duration if available
-        if (gameStats && gameStats.duration) {
-            const duration = Math.round(gameStats.duration / 1000);
-            this.add.text(400, 300, `Battle Duration: ${duration}s`, {
-                fontSize: '16px',
-                fill: '#cccccc',
-                fontFamily: 'Arial'
-            }).setOrigin(0.5);
+
+        // Store result in game manager
+        if (this.gameManager) {
+            this.gameManager.gameState.gameResult = gameResult;
+            this.gameManager.gameState.phase = 'results';
         }
-        
-        // Add restart instructions
-        this.add.text(400, 350, 'Press R to play again or M for menu', {
-            fontSize: '18px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
-            stroke: '#000000',
-            strokeThickness: 2
-        }).setOrigin(0.5);
-        
-        // Disable the scene and set up restart controls
+        // Disable the scene 
         this.gameEnded = true;
         this.physics.pause();
-        
-        // Set up restart/menu keys
-        const rKey = this.input.keyboard.addKey('R');
-        const mKey = this.input.keyboard.addKey('M');
-        
-        rKey.once('down', () => {
-            console.log('🔄 Restarting game...');
-            this.restartGame();
-        });
-        
-        mKey.once('down', () => {
-            console.log('🏠 Returning to menu...');
-            this.returnToMenu();
-        });
         
         // Disable all fighter movement and actions
         Object.values(this.fighters).forEach(fighter => {
@@ -984,9 +978,14 @@ class CombatScene extends Phaser.Scene {
                 fighter.sprite.body.setImmovable(true);
             }
         });
-        
-        // Store game over data
-        this.gameOverData = data;
+
+        // Transition to ResultsScene after a brief delay
+        this.time.delayedCall(1500, () => {
+            console.log('🎯 Transitioning to ResultsScene...');
+            if (this.gameManager) {
+                this.gameManager.handlePhaseChange('results');
+            }
+        });
         
         } catch (error) {
             console.error('❌ Error in handleServerGameOver:', error);

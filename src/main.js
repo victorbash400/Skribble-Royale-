@@ -4,13 +4,17 @@ import CombatScene from './scenes/CombatScene.js';
 import ResultsScene from './scenes/ResultsScene.js';
 import GameManager from './components/GameManager.js';
 
-// Phaser 3 game configuration
+// Phaser 3 game configuration with fullscreen
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
+    width: window.innerWidth,
+    height: window.innerHeight,
     parent: 'game-container',
-    backgroundColor: '#34495e',
+    backgroundColor: '#f8f8f8', // Soft paper white
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     physics: {
         default: 'arcade',
         arcade: {
