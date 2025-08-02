@@ -66,9 +66,32 @@ class MenuScene extends Phaser.Scene {
             fontFamily: 'Arial'
         }).setOrigin(0.5);
 
-        // Join Room Section
+        // Join Room Section  
         this.add.text(500, 220, 'Join Existing Room', {
             fontSize: '20px',
+            fill: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        const joinButton = this.add.rectangle(500, 260, 180, 40, 0x2196F3)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.joinRoom())
+            .on('pointerover', () => joinButton.setFillStyle(0x1976D2))
+            .on('pointerout', () => joinButton.setFillStyle(0x2196F3));
+
+        this.add.text(500, 260, 'Join Room', {
+            fontSize: '16px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Separator line
+        this.add.line(400, 320, 0, 0, 600, 0, 0x666666);
+
+        // Enter Room Code Section (completely separate)
+        this.add.text(400, 350, 'Enter Room Code', {
+            fontSize: '18px',
             fill: '#ffffff',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -77,20 +100,8 @@ class MenuScene extends Phaser.Scene {
         // Room code input field (HTML element)
         this.createRoomCodeInput();
 
-        const joinButton = this.add.rectangle(500, 300, 180, 40, 0x2196F3)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.joinRoom())
-            .on('pointerover', () => joinButton.setFillStyle(0x1976D2))
-            .on('pointerout', () => joinButton.setFillStyle(0x2196F3));
-
-        this.add.text(500, 300, 'Join Room', {
-            fontSize: '16px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
         // Room code display (for created rooms)
-        this.roomCodeDisplay = this.add.text(400, 360, '', {
+        this.roomCodeDisplay = this.add.text(400, 420, '', {
             fontSize: '18px',
             fill: '#00ff00',
             fontFamily: 'Arial',
@@ -98,14 +109,14 @@ class MenuScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Status message
-        this.statusMessage = this.add.text(400, 400, '', {
+        this.statusMessage = this.add.text(400, 460, '', {
             fontSize: '14px',
             fill: '#ffff00',
             fontFamily: 'Arial'
         }).setOrigin(0.5);
 
         // Instructions
-        this.add.text(400, 450, 'Share the room code with your opponent to start playing!', {
+        this.add.text(400, 500, 'Share the room code with your opponent to start playing!', {
             fontSize: '12px',
             fill: '#888888',
             fontFamily: 'Arial'
@@ -119,8 +130,8 @@ class MenuScene extends Phaser.Scene {
         inputElement.placeholder = 'Enter room code';
         inputElement.maxLength = 6;
         inputElement.style.position = 'absolute';
-        inputElement.style.left = '420px';
-        inputElement.style.top = '265px';
+        inputElement.style.left = '320px';  // Centered below the separator
+        inputElement.style.top = '380px';   // In the separate section
         inputElement.style.width = '160px';
         inputElement.style.height = '30px';
         inputElement.style.fontSize = '16px';
@@ -130,6 +141,7 @@ class MenuScene extends Phaser.Scene {
         inputElement.style.border = '2px solid #666666';
         inputElement.style.borderRadius = '4px';
         inputElement.style.outline = 'none';
+        inputElement.style.zIndex = '10';
 
         // Add event listeners
         inputElement.addEventListener('input', (e) => {
@@ -361,6 +373,15 @@ class MenuScene extends Phaser.Scene {
                 this.connectionText.setText('Connecting...');
                 this.connectionText.setFill('#ffff00');
         }
+    }
+
+    shutdown() {
+        // Clean up HTML input element when scene shuts down
+        if (this.roomCodeInput && this.roomCodeInput.parentNode) {
+            this.roomCodeInput.parentNode.removeChild(this.roomCodeInput);
+            this.roomCodeInput = null;
+        }
+        console.log('MenuScene shut down and cleaned up');
     }
 
     update() {

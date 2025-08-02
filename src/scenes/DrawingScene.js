@@ -47,131 +47,191 @@ class DrawingScene extends Phaser.Scene {
     }
 
     createUI() {
-        // Title
-        this.titleText = this.add.text(400, 50, 'Draw Your Fighter!', {
-            fontSize: '32px',
+        // Modern title with gradient effect simulation
+        this.titleText = this.add.text(400, 40, 'Draw Your Fighter!', {
+            fontSize: '36px',
+            fill: '#4CAF50',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Subtitle with better spacing
+        this.statusText = this.add.text(400, 80, 'Create your unique fighter by drawing on the canvas', {
+            fontSize: '16px',
+            fill: '#e0e0e0',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Room info with modern styling
+        const gameState = this.gameManager ? this.gameManager.getGameState() : null;
+        if (gameState && gameState.roomCode) {
+            // Room code with background
+            const roomBg = this.add.rectangle(400, 115, 150, 25, 0x2c2c2c);
+            roomBg.setStrokeStyle(1, 0x4CAF50);
+            
+            this.roomText = this.add.text(400, 115, `Room: ${gameState.roomCode}`, {
+                fontSize: '14px',
+                fill: '#4CAF50',
+                fontFamily: 'Arial',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+        }
+
+        // Add canvas area indicator
+        this.add.text(400, 150, '⬇ Draw Here ⬇', {
+            fontSize: '14px',
+            fill: '#888888',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // HTML canvas will be added in initializeDrawingCanvas()
+    }
+
+    initializeDrawingCanvas() {
+        // Create drawing canvas instance (slightly smaller for better fit)
+        this.drawingCanvas = new DrawingCanvas(380, 320);
+        
+        // Modern, centered canvas styling
+        const canvas = this.drawingCanvas.getCanvas();
+        canvas.style.position = 'absolute';
+        canvas.style.left = '50%';
+        canvas.style.top = '280px';
+        canvas.style.transform = 'translateX(-50%)'; // Perfect centering
+        canvas.style.zIndex = '5';
+        canvas.style.backgroundColor = '#ffffff';
+        canvas.style.borderRadius = '12px';
+        canvas.style.border = '3px solid #4CAF50';
+        canvas.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3), 0 4px 8px rgba(76,175,80,0.2)';
+        canvas.style.display = 'block';
+        canvas.style.cursor = 'crosshair';
+        
+        // Add subtle animation on hover
+        canvas.addEventListener('mouseenter', () => {
+            canvas.style.transform = 'translateX(-50%) scale(1.02)';
+            canvas.style.transition = 'transform 0.2s ease';
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            canvas.style.transform = 'translateX(-50%) scale(1)';
+        });
+        
+        // Add canvas to the DOM
+        document.body.appendChild(canvas);
+        
+        console.log('Modern drawing canvas initialized and centered');
+    }
+
+    createDrawingTools() {
+        const toolY = 200; // Move tools to the left side of canvas
+        
+        // Tools section header
+        this.add.text(120, toolY - 30, 'Drawing Tools', {
+            fontSize: '16px',
+            fill: '#4CAF50',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Tool selection buttons (vertical layout)
+        this.toolButtons.brush = this.add.rectangle(120, toolY, 80, 35, 0x4CAF50)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.selectTool('brush'))
+            .on('pointerover', () => this.toolButtons.brush.setFillStyle(0x45a049))
+            .on('pointerout', () => this.selectTool(this.currentTool));
+        
+        this.add.text(120, toolY, '🖌️ Brush', {
+            fontSize: '12px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        this.toolButtons.eraser = this.add.rectangle(120, toolY + 45, 80, 35, 0x666666)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.selectTool('eraser'))
+            .on('pointerover', () => this.toolButtons.eraser.setFillStyle(0x777777))
+            .on('pointerout', () => this.selectTool(this.currentTool));
+        
+        this.add.text(120, toolY + 45, '🧽 Eraser', {
+            fontSize: '12px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Color palette section
+        this.add.text(120, toolY + 100, 'Colors', {
+            fontSize: '14px',
             fill: '#ffffff',
             fontFamily: 'Arial',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Status text
-        this.statusText = this.add.text(400, 90, 'Create your fighter by drawing on the canvas below', {
-            fontSize: '16px',
-            fill: '#cccccc',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        // Room info
-        const gameState = this.gameManager ? this.gameManager.getGameState() : null;
-        if (gameState && gameState.roomCode) {
-            this.roomText = this.add.text(400, 120, `Room: ${gameState.roomCode}`, {
-                fontSize: '14px',
-                fill: '#00ff00',
-                fontFamily: 'Arial'
-            }).setOrigin(0.5);
-        }
-
-        // Canvas container placeholder (will be replaced with HTML canvas)
-        this.canvasContainer = this.add.rectangle(400, 300, 420, 420, 0x333333, 0.3);
-        this.canvasContainer.setStrokeStyle(2, 0x666666);
-    }
-
-    initializeDrawingCanvas() {
-        // Create drawing canvas instance
-        this.drawingCanvas = new DrawingCanvas(400, 400);
-        
-        // Position the canvas in the center of the screen
-        const canvas = this.drawingCanvas.getCanvas();
-        canvas.style.position = 'absolute';
-        canvas.style.left = '200px'; // Center horizontally (400px game width / 2 - 200px canvas width / 2)
-        canvas.style.top = '100px';  // Position below UI elements
-        canvas.style.zIndex = '10';
-        canvas.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-        canvas.style.borderRadius = '8px';
-        
-        // Add canvas to the DOM
-        document.body.appendChild(canvas);
-        
-        console.log('Drawing canvas initialized and added to DOM');
-    }
-
-    createDrawingTools() {
-        // Tool selection buttons
-        const toolY = 550;
-        
-        // Brush tool button
-        this.toolButtons.brush = this.add.rectangle(200, toolY, 80, 40, 0x4CAF50)
-            .setInteractive()
-            .on('pointerdown', () => this.selectTool('brush'));
-        
-        this.add.text(200, toolY, 'Brush', {
-            fontSize: '14px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        // Eraser tool button
-        this.toolButtons.eraser = this.add.rectangle(300, toolY, 80, 40, 0x666666)
-            .setInteractive()
-            .on('pointerdown', () => this.selectTool('eraser'));
-        
-        this.add.text(300, toolY, 'Eraser', {
-            fontSize: '14px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        // Color selection buttons
-        const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'];
+        const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#FFFFFF', '#FFA500'];
         colors.forEach((color, index) => {
-            const x = 420 + (index * 35);
-            this.colorButtons[color] = this.add.rectangle(x, toolY, 30, 30, parseInt(color.replace('#', '0x')))
-                .setInteractive()
+            const row = Math.floor(index / 4);
+            const col = index % 4;
+            const x = 85 + (col * 20);
+            const y = toolY + 130 + (row * 25);
+            
+            this.colorButtons[color] = this.add.rectangle(x, y, 18, 18, parseInt(color.replace('#', '0x')))
+                .setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => this.selectColor(color));
+            
+            // Add border for white color visibility
+            if (color === '#FFFFFF') {
+                this.colorButtons[color].setStrokeStyle(1, 0x666666);
+            }
         });
 
-        // Size controls
-        this.add.text(200, toolY + 50, 'Size:', {
+        // Size controls section
+        this.add.text(120, toolY + 190, 'Brush Size', {
             fontSize: '14px',
             fill: '#ffffff',
-            fontFamily: 'Arial'
-        });
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
 
-        // Size buttons (simplified slider alternative)
         const sizes = [2, 5, 10, 15];
         sizes.forEach((size, index) => {
-            const x = 250 + (index * 40);
-            const button = this.add.rectangle(x, toolY + 50, 35, 25, 0x555555)
-                .setInteractive()
-                .on('pointerdown', () => this.selectSize(size));
+            const x = 85 + (index * 20);
+            const button = this.add.rectangle(x, toolY + 215, 18, 18, 0x555555)
+                .setInteractive({ useHandCursor: true })
+                .on('pointerdown', () => this.selectSize(size))
+                .on('pointerover', () => button.setFillStyle(0x777777))
+                .on('pointerout', () => button.setFillStyle(0x555555));
             
-            this.add.text(x, toolY + 50, size.toString(), {
-                fontSize: '12px',
+            this.add.text(x, toolY + 215, size.toString(), {
+                fontSize: '10px',
                 fill: '#ffffff',
                 fontFamily: 'Arial'
             }).setOrigin(0.5);
         });
 
-        // Action buttons
-        this.clearButton = this.add.rectangle(500, toolY + 50, 80, 40, 0xFF5722)
-            .setInteractive()
-            .on('pointerdown', () => this.clearCanvas());
+        // Action buttons section (right side of canvas)
+        const actionX = 680;
         
-        this.add.text(500, toolY + 50, 'Clear', {
+        this.clearButton = this.add.rectangle(actionX, toolY + 50, 90, 40, 0xFF5722)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.clearCanvas())
+            .on('pointerover', () => this.clearButton.setFillStyle(0xe64a19))
+            .on('pointerout', () => this.clearButton.setFillStyle(0xFF5722));
+        
+        this.add.text(actionX, toolY + 50, '🗑️ Clear', {
             fontSize: '14px',
             fill: '#ffffff',
             fontFamily: 'Arial'
         }).setOrigin(0.5);
 
-        this.submitButton = this.add.rectangle(600, toolY + 50, 100, 40, 0x2196F3)
-            .setInteractive()
-            .on('pointerdown', () => this.submitDrawing());
+        this.submitButton = this.add.rectangle(actionX, toolY + 100, 90, 45, 0x2196F3)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.submitDrawing())
+            .on('pointerover', () => this.submitButton.setFillStyle(0x1976D2))
+            .on('pointerout', () => this.submitButton.setFillStyle(0x2196F3));
         
-        this.add.text(600, toolY + 50, 'Submit', {
-            fontSize: '14px',
+        this.add.text(actionX, toolY + 100, '✅ Submit\nDrawing', {
+            fontSize: '12px',
             fill: '#ffffff',
-            fontFamily: 'Arial'
+            fontFamily: 'Arial',
+            align: 'center'
         }).setOrigin(0.5);
 
         // Initialize tool selection
@@ -404,11 +464,30 @@ class DrawingScene extends Phaser.Scene {
     shutdown() {
         // Clean up drawing canvas when scene shuts down
         if (this.drawingCanvas) {
-            this.drawingCanvas.removeFromDOM();
+            const canvas = this.drawingCanvas.getCanvas();
+            if (canvas && canvas.parentNode) {
+                canvas.parentNode.removeChild(canvas);
+            }
             this.drawingCanvas = null;
         }
         
         console.log('DrawingScene shut down and cleaned up');
+    }
+
+    init() {
+        // Show drawing canvas when entering this scene
+        if (this.drawingCanvas) {
+            const canvas = this.drawingCanvas.getCanvas();
+            canvas.style.display = 'block';
+        }
+    }
+
+    sleep() {
+        // Hide drawing canvas when leaving this scene
+        if (this.drawingCanvas) {
+            const canvas = this.drawingCanvas.getCanvas();
+            canvas.style.display = 'none';
+        }
     }
 
     update() {

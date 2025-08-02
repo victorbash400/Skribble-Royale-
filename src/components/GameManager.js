@@ -213,6 +213,14 @@ class GameManager {
         console.log(`Switching from ${this.currentScene} to ${sceneName}`);
         
         try {
+            // Get the current scene instance for cleanup
+            const currentSceneInstance = this.currentScene ? this.game.scene.getScene(this.currentScene) : null;
+            
+            // Call shutdown on current scene if it has the method
+            if (currentSceneInstance && typeof currentSceneInstance.shutdown === 'function') {
+                currentSceneInstance.shutdown();
+            }
+            
             // Stop current scene if it exists
             if (this.currentScene && this.game.scene.isActive(this.currentScene)) {
                 this.game.scene.stop(this.currentScene);

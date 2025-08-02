@@ -119,12 +119,6 @@ class CombatScene extends Phaser.Scene {
                     }
                 });
             });
-        
-        this.add.text(700, 100, 'TEST\nEND', {
-            fontSize: '12px',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
 
         // Add ground line visual
         this.add.line(400, this.arena.groundY - 10, 0, 0, this.arena.width, 0, 0x666666);
@@ -1066,6 +1060,26 @@ class CombatScene extends Phaser.Scene {
         ];
         
         return colors[Math.abs(hash) % colors.length];
+    }
+
+    /**
+     * Clean up when scene shuts down
+     */
+    shutdown() {
+        if (this.inputHandler) {
+            this.inputHandler.destroy();
+            this.inputHandler = null;
+        }
+        
+        // Clear all fighters
+        Object.values(this.fighters).forEach(fighter => {
+            if (fighter.sprite) {
+                fighter.sprite.destroy();
+            }
+        });
+        this.fighters = {};
+        
+        console.log('CombatScene shut down and cleaned up');
     }
 
     /**

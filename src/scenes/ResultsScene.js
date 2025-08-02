@@ -332,6 +332,11 @@ class ResultsScene extends Phaser.Scene {
         }
     }
 
+    shutdown() {
+        // Clean up results scene
+        console.log('ResultsScene shut down and cleaned up');
+    }
+
     update() {
         // Results scene update logic (minimal for now)
     }
