@@ -1,0 +1,31 @@
+{
+  "name": "scribble-royale",
+  "version": "1.0.0",
+  "description": "Browser-based multiplayer fighting game where players draw their own fighters",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'Build complete - browser-based game'",
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "phaser": "^3.70.0",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "vitest": "^1.0.0"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "drawing",
+    "fighting",
+    "browser"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing Scene Integration Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #controls {
+            margin-bottom: 20px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 4px;
+            max-width: 800px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Drawing Scene Integration Test</h1>
+        
+        <div id="controls">
+            <button onclick="testSceneTransition()">Test Scene Transition</button>
+            <button onclick="testDrawingSubmission()">Test Drawing Submission</button>
+            <button onclick="testOpponentEvents()">Test Opponent Events</button>
+            <button onclick="testConnectionEvents()">Test Connection Events</button>
+            <button onclick="resetTest()">Reset Test</button>
+        </div>
+        
+        <div id="game"></div>
+        
+        <div id="status">
+            <h3>Test Status:</h3>
+            <div id="status-content">Ready to test...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import GameManager from './src/components/GameManager.js';
+        import MenuScene from './src/scenes/MenuScene.js';
+        import DrawingScene from './src/scenes/DrawingScene.js';
+        import CombatScene from './src/scenes/CombatScene.js';
+        import ResultsScene from './src/scenes/ResultsScene.js';
+
+        // Test configuration
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game',
+            backgroundColor: '#2c3e50',
+            scene: [MenuScene, DrawingScene, CombatScene, ResultsScene],
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 300 },
+                    debug: false
+                }
+            }
+        };
+
+        // Initialize game and GameManager
+        const game = new Phaser.Game(config);
+        const gameManager = new GameManager();
+        gameManager.game = game;
+        window.gameManager = gameManager;
+
+        // Mock WebSocket for testing
+        class MockWebSocket {
+            constructor(url) {
+                this.url = url;
+                this.readyState = WebSocket.OPEN;
+                setTimeout(() => {
+                    if (this.onopen) this.onopen();
+                }, 100);
+            }
+
+            send(data) {
+                console.log('Mock WebSocket send:', data);
+                updateStatus(`Sent: ${data}`);
+            }
+
+            close() {
+                this.readyState = WebSocket.CLOSED;
+                if (this.onclose) this.onclose();
+            }
+        }
+
+        // Replace WebSocket with mock
+        window.WebSocket = MockWebSocket;
+
+        // Test functions
+        window.testSceneTransition = function() {
+            updateStatus('Testing scene transition to DrawingScene...');
+            gameManager.switchScene('DrawingScene');
+            
+            setTimeout(() => {
+                const activeScene = game.scene.getScene('DrawingScene');
+                if (activeScene && activeScene.scene.isActive()) {
+                    updateStatus('✅ Scene transition successful! DrawingScene is active.');
+                    
+                    // Test if drawing canvas is initialized
+                    if (activeScene.drawingCanvas) {
+                        updateStatus('✅ Drawing canvas initialized successfully.');
+                    } else {
+                        updateStatus('❌ Drawing canvas not initialized.');
+                    }
+                } else {
+                    updateStatus('❌ Scene transition failed.');
+                }
+            }, 500);
+        };
+
+        window.testDrawingSubmission = function() {
+            updateStatus('Testing drawing submission...');
+            const drawingScene = game.scene.getScene('DrawingScene');
+            
+            if (!drawingScene || !drawingScene.scene.isActive()) {
+                updateStatus('❌ DrawingScene not active. Switch to DrawingScene first.');
+                return;
+            }
+
+            // Mock a drawing by creating some bounds
+            if (drawingScene.drawingCanvas) {
+                drawingScene.drawingCanvas.getDrawingBounds = () => ({ minX: 10, minY: 10, maxX: 50, maxY: 50 });
+                drawingScene.drawingCanvas.exportToPNG = () => 'data:image/png;base64,mock-drawing-data';
+                
+                drawingScene.submitDrawing();
+                
+                if (drawingScene.isDrawingComplete) {
+                    updateStatus('✅ Drawing submission successful! Tools disabled and waiting for opponent.');
+                } else {
+                    updateStatus('❌ Drawing submission failed.');
+                }
+            } else {
+                updateStatus('❌ Drawing canvas not available.');
+            }
+        };
+
+        window.testOpponentEvents = function() {
+            updateStatus('Testing opponent events...');
+            const drawingScene = game.scene.getScene('DrawingScene');
+            
+            if (!drawingScene || !drawingScene.scene.isActive()) {
+                updateStatus('❌ DrawingScene not active. Switch to DrawingScene first.');
+                return;
+            }
+
+            // Simulate opponent joining
+            drawingScene.handleGameManagerEvent('player_joined', { playerId: 'opponent-123' });
+            updateStatus('✅ Opponent joined event handled.');
+
+            setTimeout(() => {
+                // Simulate opponent submitting drawing
+                drawingScene.handleGameManagerEvent('fighter_submit', { playerId: 'opponent-123' });
+                updateStatus('✅ Opponent drawing submission event handled.');
+            }, 1000);
+
+            setTimeout(() => {
+                // Simulate phase change to combat
+                drawingScene.handleGameManagerEvent('phase_change', { phase: 'combat' });
+                updateStatus('✅ Phase change to combat event handled.');
+            }, 2000);
+        };
+
+        window.testConnectionEvents = function() {
+            updateStatus('Testing connection events...');
+            const drawingScene = game.scene.getScene('DrawingScene');
+            
+            if (!drawingScene || !drawingScene.scene.isActive()) {
+                updateStatus('❌ DrawingScene not active. Switch to DrawingScene first.');
+                return;
+            }
+
+            // Test disconnection
+            drawingScene.handleGameManagerEvent('connection_status', { status: 'disconnected' });
+            updateStatus('✅ Disconnection event handled.');
+
+            setTimeout(() => {
+                // Test reconnection
+                drawingScene.handleGameManagerEvent('connection_status', { status: 'connected' });
+                updateStatus('✅ Reconnection event handled.');
+            }, 1500);
+        };
+
+        window.resetTest = function() {
+            updateStatus('Resetting test...');
+            
+            // Clean up any existing drawing scene
+            const drawingScene = game.scene.getScene('DrawingScene');
+            if (drawingScene && drawingScene.drawingCanvas) {
+                drawingScene.shutdown();
+            }
+            
+            // Switch back to menu
+            gameManager.switchScene('MenuScene');
+            
+            setTimeout(() => {
+                updateStatus('✅ Test reset complete. Ready for new tests.');
+            }, 500);
+        };
+
+        function updateStatus(message) {
+            const statusContent = document.getElementById('status-content');
+            const timestamp = new Date().toLocaleTimeString();
+            statusContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            statusContent.scrollTop = statusContent.scrollHeight;
+            console.log(message);
+        }
+
+        // Initialize with menu scene
+        game.events.once('ready', () => {
+            updateStatus('Game initialized. Ready for testing.');
+            gameManager.switchScene('MenuScene');
+        });
+
+        // Mock game state for testing
+        gameManager.getGameState = () => ({
+            phase: 'drawing',
+            roomCode: 'TEST123',
+            players: {
+                'test-player-1': { id: 'test-player-1', ready: false },
+                'test-player-2': { id: 'test-player-2', ready: false }
+            }
+        });
+
+        gameManager.playerId = 'test-player-1';
+    </script>
+</body>
+</html>

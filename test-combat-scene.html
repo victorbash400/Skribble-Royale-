@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combat Scene Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #2c3e50;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            border: 2px solid #34495e;
+            margin: 20px 0;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #34495e;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Combat Scene Test</h1>
+    <div class="status">
+        <p><strong>Status:</strong> <span id="status">Initializing...</span></p>
+        <p><strong>Fighters:</strong> <span id="fighter-count">0</span></p>
+    </div>
+    
+    <div class="controls">
+        <button onclick="testFighterPositioning()">Test Fighter Positioning</button>
+        <button onclick="testPhysics()">Test Physics</button>
+        <button onclick="clearFighters()">Clear Fighters</button>
+        <button onclick="simulateGameState()">Simulate Game State</button>
+    </div>
+    
+    <div id="game-container"></div>
+    
+    <div class="status">
+        <h3>Test Results:</h3>
+        <div id="test-results"></div>
+    </div>
+
+    <script type="module">
+        import GameManager from './src/components/GameManager.js';
+        import CombatScene from './src/scenes/CombatScene.js';
+        
+        let game;
+        let combatScene;
+        let gameManager;
+        
+        // Initialize test environment
+        function initializeTest() {
+            updateStatus('Setting up test environment...');
+            
+            // Create GameManager
+            gameManager = new GameManager();
+            window.gameManager = gameManager;
+            
+            // Mock game state for testing
+            gameManager.gameState = {
+                phase: 'combat',
+                roomCode: 'TEST123',
+                players: {
+                    'player1': { 
+                        id: 'player1', 
+                        name: 'Player 1',
+                        pngData: null // Will use default fighter
+                    },
+                    'player2': { 
+                        id: 'player2', 
+                        name: 'Player 2',
+                        pngData: null // Will use default fighter
+                    }
+                }
+            };
+            
+            // Phaser game configuration
+            const config = {
+                type: Phaser.AUTO,
+                width: 800,
+                height: 600,
+                parent: 'game-container',
+                backgroundColor: '#001122',
+                physics: {
+                    default: 'arcade',
+                    arcade: {
+                        gravity: { y: 300 },
+                        debug: false
+                    }
+                },
+                scene: CombatScene
+            };
+            
+            // Create game
+            game = new Phaser.Game(config);
+            
+            // Get scene reference when it's created
+            game.events.on('ready', () => {
+                combatScene = game.scene.getScene('CombatScene');
+                gameManager.game = game;
+                updateStatus('Combat scene loaded successfully');
+                updateFighterCount();
+                logResult('✅ Combat scene initialized');
+            });
+        }
+        
+        // Test functions
+        window.testFighterPositioning = function() {
+            if (!combatScene) {
+                logResult('❌ Combat scene not ready');
+                return;
+            }
+            
+            updateStatus('Testing fighter positioning...');
+            combatScene.testFighterPositioning();
+            
+            setTimeout(() => {
+                updateFighterCount();
+                logResult('✅ Fighter positioning test completed');
+                updateStatus('Fighter positioning test completed');
+            }, 100);
+        };
+        
+        window.testPhysics = function() {
+            if (!combatScene) {
+                logResult('❌ Combat scene not ready');
+                return;
+            }
+            
+            updateStatus('Testing physics...');
+            
+            // Check if physics world is configured
+            const physicsWorld = combatScene.physics.world;
+            const hasGravity = physicsWorld.gravity.y > 0;
+            const hasBounds = physicsWorld.bounds.width > 0;
+            
+            if (hasGravity && hasBounds) {
+                logResult('✅ Physics world configured correctly');
+                logResult(`   - Gravity: ${physicsWorld.gravity.y}`);
+                logResult(`   - Bounds: ${physicsWorld.bounds.width}x${physicsWorld.bounds.height}`);
+            } else {
+                logResult('❌ Physics world configuration issues');
+            }
+            
+            updateStatus('Physics test completed');
+        };
+        
+        window.clearFighters = function() {
+            if (!combatScene) {
+                logResult('❌ Combat scene not ready');
+                return;
+            }
+            
+            updateStatus('Clearing fighters...');
+            combatScene.clearFighters();
+            
+            setTimeout(() => {
+                updateFighterCount();
+                logResult('✅ Fighters cleared');
+                updateStatus('Fighters cleared');
+            }, 100);
+        };
+        
+        window.simulateGameState = function() {
+            if (!combatScene) {
+                logResult('❌ Combat scene not ready');
+                return;
+            }
+            
+            updateStatus('Simulating game state update...');
+            
+            // Simulate a game state update event
+            combatScene.handleGameManagerEvent('game_state_update', {
+                gameState: gameManager.gameState
+            });
+            
+            setTimeout(() => {
+                updateFighterCount();
+                logResult('✅ Game state simulation completed');
+                updateStatus('Game state simulation completed');
+            }, 500);
+        };
+        
+        // Helper functions
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+        
+        function updateFighterCount() {
+            if (combatScene) {
+                const count = Object.keys(combatScene.getAllFighters()).length;
+                document.getElementById('fighter-count').textContent = count;
+            }
+        }
+        
+        function logResult(message) {
+            const resultsDiv = document.getElementById('test-results');
+            const p = document.createElement('p');
+            p.textContent = message;
+            p.style.margin = '5px 0';
+            if (message.includes('✅')) {
+                p.style.color = '#2ecc71';
+            } else if (message.includes('❌')) {
+                p.style.color = '#e74c3c';
+            }
+            resultsDiv.appendChild(p);
+        }
+        
+        // Start the test
+        initializeTest();
+    </script>
+</body>
+</html>

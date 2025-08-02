@@ -1,0 +1,1084 @@
+import Fighter from '../components/Fighter.js';
+import InputHandler from '../components/InputHandler.js';
+
+class CombatScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'CombatScene' });
+        this.gameManager = null;
+        this.fighters = {};
+        this.inputHandler = null;
+        this.playerFighterId = null; // ID of the fighter controlled by this player
+        this.arena = {
+            width: 800,
+            height: 600,
+            groundY: 500,
+            leftSpawnX: 150,
+            rightSpawnX: 650
+        };
+        this.ground = null;
+        this.walls = [];
+        this.fightersLoaded = false;
+    }
+
+    preload() {
+        // Combat assets will be loaded here in future tasks
+    }
+
+    create() {
+        console.log('CombatScene created');
+
+        // Get reference to GameManager
+        this.gameManager = window.gameManager;
+
+        // Initialize input handler
+        this.setupInputHandler();
+
+        // Setup physics world
+        this.setupPhysicsWorld();
+
+        // Create arena
+        this.createArena();
+
+        // Setup UI
+        this.setupUI();
+
+        // Load fighters from game state
+        this.loadFighters();
+    }
+
+    /**
+     * Setup input handler for fighter control
+     */
+    setupInputHandler() {
+        this.inputHandler = new InputHandler();
+        this.inputHandler.initialize();
+
+        // Determine which fighter this player controls
+        if (this.gameManager && this.gameManager.playerId) {
+            this.playerFighterId = this.gameManager.playerId;
+            console.log(`Player will control fighter: ${this.playerFighterId}`);
+        }
+
+        console.log('Input handler initialized');
+    }
+
+    /**
+     * Configure physics world for combat
+     */
+    setupPhysicsWorld() {
+        // Enable physics
+        this.physics.world.setBounds(0, 0, this.arena.width, this.arena.height);
+        this.physics.world.setBoundsCollision(true, true, true, false);
+
+        // Set gravity
+        this.physics.world.gravity.y = 300;
+
+        console.log('Physics world configured');
+    }
+
+    /**
+     * Create the combat arena with ground and boundaries
+     */
+    createArena() {
+        // Create background
+        this.add.rectangle(400, 300, 800, 600, 0x001122);
+
+        // Create ground
+        this.ground = this.add.rectangle(400, this.arena.groundY, this.arena.width, 20, 0x4a4a4a);
+        this.physics.add.existing(this.ground, true); // Static body
+
+        // Create side walls (invisible collision boundaries)
+        const leftWall = this.add.rectangle(0, 300, 20, 600, 0x000000, 0);
+        const rightWall = this.add.rectangle(800, 300, 20, 600, 0x000000, 0);
+
+        this.physics.add.existing(leftWall, true);
+        this.physics.add.existing(rightWall, true);
+
+        this.walls = [leftWall, rightWall];
+
+        // Add arena decorations
+        this.add.text(400, 50, 'COMBAT ARENA', {
+            fontSize: '32px',
+            fill: '#ffffff',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        
+        // TEST BUTTON - manually trigger game over
+        const testButton = this.add.rectangle(700, 100, 100, 40, 0xff0000)
+            .setInteractive()
+            .on('pointerdown', () => {
+                console.log('🧪 MANUAL GAME OVER TEST');
+                this.handleServerGameOver({
+                    data: {
+                        winner: this.gameManager?.playerId,
+                        defeatedPlayer: 'test_player',
+                        finalHealth: {},
+                        gameStats: { duration: 30000 }
+                    }
+                });
+            });
+        
+        this.add.text(700, 100, 'TEST\nEND', {
+            fontSize: '12px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Add ground line visual
+        this.add.line(400, this.arena.groundY - 10, 0, 0, this.arena.width, 0, 0x666666);
+
+        console.log('Arena created');
+    }
+
+    /**
+     * Setup combat UI elements
+     */
+    setupUI() {
+        // Room info display
+        const gameState = this.gameManager ? this.gameManager.getGameState() : null;
+        if (gameState && gameState.roomCode) {
+            this.add.text(400, 80, `Room: ${gameState.roomCode}`, {
+                fontSize: '14px',
+                fill: '#00ff00',
+                fontFamily: 'Arial'
+            }).setOrigin(0.5);
+        }
+
+        // Combat status
+        this.add.text(400, 110, 'Fighters Loading...', {
+            fontSize: '16px',
+            fill: '#ffff00',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+    }
+
+    /**
+     * Load fighters from submitted PNG data
+     */
+    async loadFighters() {
+        const gameState = this.gameManager ? this.gameManager.getGameState() : null;
+
+        if (!gameState || !gameState.players) {
+            console.warn('No game state or players available');
+            return;
+        }
+
+        const players = Object.values(gameState.players);
+        console.log('Loading fighters for players:', players);
+
+        // Clear existing fighters
+        this.clearFighters();
+
+        let fighterIndex = 0;
+        const maxFighters = 2; // Support up to 2 fighters for now
+
+        for (const player of players) {
+            if (fighterIndex >= maxFighters) break;
+
+            try {
+                await this.spawnFighter(player, fighterIndex);
+                fighterIndex++;
+            } catch (error) {
+                console.error(`Failed to spawn fighter for player ${player.id}:`, error);
+            }
+        }
+
+        this.fightersLoaded = true;
+        this.updateCombatStatus();
+    }
+
+    /**
+     * Spawn a fighter at the appropriate position
+     * @param {Object} player - Player data containing PNG data
+     * @param {number} index - Fighter index (0 = left, 1 = right)
+     */
+    async spawnFighter(player, index) {
+        if (!player || !player.pngData) {
+            console.warn('Player missing PNG data:', player);
+            // Create a default fighter for testing
+            return this.spawnDefaultFighter(player, index);
+        }
+
+        // Determine spawn position
+        const spawnX = index === 0 ? this.arena.leftSpawnX : this.arena.rightSpawnX;
+        const spawnY = this.arena.groundY - 50; // Spawn above ground
+
+        // Create fighter
+        const fighter = new Fighter(this, spawnX, spawnY, player.pngData);
+
+        try {
+            // Load fighter from PNG data
+            const success = await fighter.loadFromPNG(player.pngData);
+
+            if (success) {
+                // Store fighter reference
+                this.fighters[player.id] = fighter;
+
+                // Setup collision with ground and walls
+                this.setupFighterCollisions(fighter);
+
+                console.log(`Fighter spawned for player ${player.id} at position (${spawnX}, ${spawnY})`);
+            } else {
+                throw new Error('Failed to load fighter from PNG');
+            }
+        } catch (error) {
+            console.error('Error spawning fighter:', error);
+            // Fallback to default fighter
+            fighter.destroy();
+            return this.spawnDefaultFighter(player, index);
+        }
+    }
+
+    /**
+     * Spawn a default fighter for testing when PNG data is not available
+     * @param {Object} player - Player data
+     * @param {number} index - Fighter index
+     */
+    spawnDefaultFighter(player, index) {
+        const spawnX = index === 0 ? this.arena.leftSpawnX : this.arena.rightSpawnX;
+        const spawnY = this.arena.groundY - 50;
+
+        // Create a simple colored rectangle as default fighter
+        // Use consistent color based on player ID hash, not index
+        const playerColor = this.getPlayerColor(player.id);
+        const defaultSprite = this.add.rectangle(spawnX, spawnY, 40, 60, playerColor);
+        this.physics.add.existing(defaultSprite);
+
+        if (defaultSprite.body) {
+            defaultSprite.body.setCollideWorldBounds(true);
+            defaultSprite.body.setBounce(0.2);
+            defaultSprite.body.setGravityY(300);
+        }
+
+        // Create health bar
+        const healthBarBg = this.add.rectangle(spawnX, spawnY - 40, 60, 8, 0x000000);
+        const healthBar = this.add.rectangle(spawnX, spawnY - 40, 58, 6, 0x00ff00);
+        
+        // Create player name label
+        const nameLabel = this.add.text(spawnX, spawnY - 55, player.id.substring(7, 13), {
+            fontSize: '10px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Create a simple fighter object with methods
+        const fighter = {
+            sprite: defaultSprite,
+            health: 100,
+            maxHealth: 100,
+            playerId: player.id,
+            isDefault: true,
+            healthBar: healthBar,
+            healthBarBg: healthBarBg,
+            nameLabel: nameLabel,
+            originalColor: playerColor,
+            move: (direction) => {
+                if (defaultSprite.body) {
+                    const moveSpeed = 150;
+                    defaultSprite.body.setVelocityX(direction * moveSpeed);
+                }
+            },
+            jump: () => {
+                if (defaultSprite.body && (defaultSprite.body.blocked.down || defaultSprite.body.touching.down)) {
+                    defaultSprite.body.setVelocityY(-400);
+                }
+            },
+            attack: () => {
+                // Flash attack effect
+                defaultSprite.setFillStyle(0xff0000);
+                this.time.delayedCall(200, () => {
+                    defaultSprite.setFillStyle(playerColor);
+                });
+                
+                // Don't calculate damage locally - let server handle it
+                // Just show attack animation
+            },
+            canMove: () => fighter.health > 0,
+            canJump: () => fighter.health > 0 && defaultSprite.body && (defaultSprite.body.blocked.down || defaultSprite.body.touching.down),
+            canAttack: () => fighter.health > 0,
+            updateHealthBar: () => {
+                if (healthBar && healthBarBg && nameLabel) {
+                    // Update positions to follow fighter
+                    healthBarBg.x = defaultSprite.x;
+                    healthBarBg.y = defaultSprite.y - 40;
+                    healthBar.x = defaultSprite.x;
+                    healthBar.y = defaultSprite.y - 40;
+                    nameLabel.x = defaultSprite.x;
+                    nameLabel.y = defaultSprite.y - 55;
+                    
+                    // Update health bar width
+                    const healthPercent = fighter.health / fighter.maxHealth;
+                    healthBar.scaleX = healthPercent;
+                    
+                    // Change color based on health
+                    if (healthPercent > 0.6) {
+                        healthBar.setFillStyle(0x00ff00); // Green
+                    } else if (healthPercent > 0.3) {
+                        healthBar.setFillStyle(0xffff00); // Yellow
+                    } else {
+                        healthBar.setFillStyle(0xff0000); // Red
+                    }
+                }
+            },
+            takeDamage: (damage, fromNetwork = false) => {
+                fighter.health = Math.max(0, fighter.health - damage);
+                fighter.updateHealthBar();
+                
+                // Flash damage effect
+                defaultSprite.setFillStyle(0xffffff);
+                this.time.delayedCall(100, () => {
+                    defaultSprite.setFillStyle(playerColor);
+                });
+                
+                console.log(`💔 ${fighter.playerId.substring(7, 13)} took ${damage} damage, health: ${fighter.health}`);
+                
+                // Only send network update if this damage wasn't from network
+                if (!fromNetwork && this.gameManager) {
+                    this.gameManager.sendPlayerAction({
+                        action: 'health_update',
+                        health: fighter.health,
+                        damage: damage,
+                        position: { x: defaultSprite.x, y: defaultSprite.y },
+                        timestamp: Date.now()
+                    });
+                }
+                
+                // Check if dead
+                if (fighter.health <= 0) {
+                    this.handleFighterDeath(fighter);
+                }
+            },
+            isAlive: () => fighter.health > 0,
+            destroy: () => {
+                if (defaultSprite) defaultSprite.destroy();
+                if (healthBar) healthBar.destroy();
+                if (healthBarBg) healthBarBg.destroy();
+                if (nameLabel) nameLabel.destroy();
+            }
+        };
+
+        this.fighters[player.id] = fighter;
+        this.setupFighterCollisions(fighter);
+
+        console.log(`Default fighter spawned for player ${player.id}`);
+    }
+
+    /**
+     * Setup collision detection for a fighter
+     * @param {Fighter} fighter - Fighter instance
+     */
+    setupFighterCollisions(fighter) {
+        if (!fighter.sprite) return;
+
+        // Collision with ground
+        this.physics.add.collider(fighter.sprite, this.ground);
+
+        // Collision with walls
+        this.walls.forEach(wall => {
+            this.physics.add.collider(fighter.sprite, wall);
+        });
+
+        // Collision with other fighters
+        Object.values(this.fighters).forEach(otherFighter => {
+            if (otherFighter !== fighter && otherFighter.sprite) {
+                this.physics.add.collider(fighter.sprite, otherFighter.sprite);
+            }
+        });
+    }
+
+    /**
+     * Clear all existing fighters
+     */
+    clearFighters() {
+        Object.values(this.fighters).forEach(fighter => {
+            if (fighter.destroy) {
+                fighter.destroy();
+            } else if (fighter.sprite) {
+                fighter.sprite.destroy();
+            }
+        });
+        this.fighters = {};
+    }
+
+    /**
+     * Update combat status display
+     */
+    updateCombatStatus() {
+        const fighterCount = Object.keys(this.fighters).length;
+        let statusText = '';
+
+        if (fighterCount === 0) {
+            statusText = 'No fighters loaded';
+        } else if (fighterCount === 1) {
+            statusText = 'Waiting for opponent...';
+        } else {
+            statusText = 'Ready to fight!';
+        }
+
+        // Find and update status text (this is a simple approach)
+        this.children.list.forEach(child => {
+            if (child.type === 'Text' && child.text.includes('Loading')) {
+                child.setText(statusText);
+            }
+        });
+    }
+
+    /**
+     * Handle events from GameManager
+     */
+    handleGameManagerEvent(eventType, data) {
+        // Only log important events
+        if (eventType === 'game_over' || eventType === 'server_damage') {
+            console.log(`CombatScene received event: ${eventType}`, data);
+        }
+
+        switch (eventType) {
+            case 'game_state_update':
+                // Update fighter states from network
+                this.updateFighterStates(data);
+                break;
+            case 'player_joined':
+                // New player joined, reload fighters
+                this.loadFighters();
+                break;
+            case 'player_left':
+                // Player left, remove their fighter
+                if (data.playerId && this.fighters[data.playerId]) {
+                    const fighter = this.fighters[data.playerId];
+                    if (fighter.destroy) {
+                        fighter.destroy();
+                    } else if (fighter.sprite) {
+                        fighter.sprite.destroy();
+                    }
+                    delete this.fighters[data.playerId];
+                    this.updateCombatStatus();
+                }
+                break;
+            case 'player_action':
+                // Handle remote player actions
+                this.handleRemotePlayerAction(data);
+                break;
+            case 'server_damage':
+                // Handle server-authoritative damage
+                this.handleServerDamage(data);
+                break;
+            case 'game_over':
+                console.log('🎯 CombatScene handleGameManagerEvent - game_over received:', data);
+                // Handle server-validated game over
+                this.handleServerGameOver(data);
+                break;
+        }
+    }
+
+    /**
+     * Handle server-authoritative damage events
+     * @param {Object} data - Server damage data
+     */
+    handleServerDamage(data) {
+        console.log('🩹 CombatScene processing server damage:', data);
+        
+        const damageData = data.data || data;
+        const { attackerId, targetId, damage, newHealth, attackerPosition } = damageData;
+        
+        const targetFighter = this.fighters[targetId];
+        
+        if (targetFighter) {
+            const oldHealth = targetFighter.health;
+            targetFighter.health = newHealth;
+            
+            if (targetFighter.updateHealthBar) {
+                targetFighter.updateHealthBar();
+            }
+            
+            // Show damage effect
+            if (targetFighter.sprite) {
+                targetFighter.sprite.setFillStyle(0xffffff);
+                this.time.delayedCall(100, () => {
+                    targetFighter.sprite.setFillStyle(targetFighter.originalColor);
+                });
+                
+                // Add knockback
+                if (targetFighter.sprite.body && attackerPosition) {
+                    const knockbackForce = 200;
+                    const direction = targetFighter.sprite.x > attackerPosition.x ? 1 : -1;
+                    targetFighter.sprite.body.setVelocityX(direction * knockbackForce);
+                }
+            }
+            
+            // Check if fighter died
+            if (newHealth <= 0 && oldHealth > 0) {
+                this.handleFighterDeath(targetFighter);
+            }
+            
+            console.log(`💥 Applied server damage: ${attackerId.substring(7, 13)} → ${targetId.substring(7, 13)} (${damage} dmg, ${oldHealth} → ${newHealth} hp)`);
+        }
+    }
+
+    /**
+     * Get fighter by player ID
+     * @param {string} playerId - Player ID
+     * @returns {Fighter|null} Fighter instance
+     */
+    getFighter(playerId) {
+        return this.fighters[playerId] || null;
+    }
+
+    /**
+     * Get all fighters
+     * @returns {Object} All fighters keyed by player ID
+     */
+    getAllFighters() {
+        return { ...this.fighters };
+    }
+
+    /**
+     * Test fighter positioning (for debugging)
+     */
+    testFighterPositioning() {
+        console.log('Testing fighter positioning...');
+
+        // Create test fighters
+        const testPlayers = [
+            { id: 'test1', pngData: null },
+            { id: 'test2', pngData: null }
+        ];
+
+        testPlayers.forEach((player, index) => {
+            this.spawnDefaultFighter(player, index);
+        });
+
+        console.log('Test fighters spawned');
+    }
+
+    update(time, delta) {
+        // Don't do anything if game has ended
+        if (this.gameEnded) {
+            return;
+        }
+        
+        // Update input handler
+        if (this.inputHandler) {
+            this.inputHandler.update(delta);
+        }
+
+        // Handle player input for their fighter
+        this.handlePlayerInput();
+
+        // Update fighter health bars and positions
+        Object.values(this.fighters).forEach(fighter => {
+            if (fighter.updateHealthBar) {
+                fighter.updateHealthBar();
+            }
+        });
+
+        // Periodic game state synchronization (every 200ms to avoid spam)
+        if (!this.lastSyncTime) {
+            this.lastSyncTime = 0;
+        }
+
+        if (time - this.lastSyncTime > 200) {
+            this.syncGameState();
+            this.lastSyncTime = time;
+        }
+    }
+
+    /**
+     * Handle player input and control their fighter
+     */
+    handlePlayerInput() {
+        if (!this.inputHandler || !this.playerFighterId || this.gameEnded) {
+            return;
+        }
+
+        const playerFighter = this.fighters[this.playerFighterId];
+        if (!playerFighter || !playerFighter.canMove) {
+            return;
+        }
+
+        // Handle movement input
+        const movementDirection = this.inputHandler.getMovementDirection();
+        if (movementDirection !== 0 && playerFighter.canMove()) {
+            playerFighter.move(movementDirection);
+
+            // Send movement to other players
+            if (this.gameManager) {
+                this.gameManager.sendPlayerAction({
+                    action: 'move',
+                    direction: movementDirection,
+                    position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
+                });
+            }
+        } else if (movementDirection === 0) {
+            // Stop movement when no keys are pressed
+            playerFighter.move(0);
+
+            // Send stop movement to other players
+            if (this.gameManager) {
+                this.gameManager.sendPlayerAction({
+                    action: 'move',
+                    direction: 0,
+                    position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
+                });
+            }
+        }
+
+        // Handle jump input
+        if (this.inputHandler.isJumpPressed() && playerFighter.canJump()) {
+            playerFighter.jump();
+
+            // Send jump to other players
+            if (this.gameManager) {
+                this.gameManager.sendPlayerAction({
+                    action: 'jump',
+                    position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
+                });
+            }
+        }
+
+        // Handle attack input (with cooldown)
+        if (this.inputHandler.isAttackPressed() && playerFighter.canAttack()) {
+            playerFighter.attack();
+
+            // Send attack to server for processing
+            if (this.gameManager) {
+                this.gameManager.sendPlayerAction({
+                    action: 'attack',
+                    position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
+                });
+            }
+        }
+    }
+
+    /**
+     * Handle remote player actions from network
+     * @param {Object} data - Action data from remote player
+     */
+    handleRemotePlayerAction(data) {
+        const playerId = data.playerId;
+        const actionData = data.data || data;
+
+        // Don't process our own actions
+        if (playerId === this.playerFighterId) {
+            return;
+        }
+
+        const remoteFighter = this.fighters[playerId];
+        if (!remoteFighter) {
+            return;
+        }
+
+        const { action, direction, position } = actionData;
+        
+        // Visual feedback - flash the remote fighter
+        if (remoteFighter.sprite) {
+            const originalColor = remoteFighter.sprite.fillColor;
+            remoteFighter.sprite.setFillStyle(0x00ffff);
+            this.time.delayedCall(100, () => {
+                remoteFighter.sprite.setFillStyle(originalColor);
+            });
+        }
+
+        switch (action) {
+            case 'move':
+                if (remoteFighter.move) {
+                    remoteFighter.move(direction);
+                }
+                // Update position if provided for better sync
+                if (position && remoteFighter.sprite) {
+                    remoteFighter.sprite.x = position.x;
+                    remoteFighter.sprite.y = position.y;
+                }
+                break;
+
+            case 'jump':
+                if (remoteFighter.jump) {
+                    remoteFighter.jump();
+                }
+                console.log(`💫 Remote player jumped!`);
+                break;
+
+            case 'attack':
+                if (remoteFighter.attack) {
+                    remoteFighter.attack();
+                }
+                console.log(`💥 Remote player attacked!`);
+                break;
+        }
+    }
+
+    /**
+     * Get input handler instance
+     * @returns {InputHandler|null}
+     */
+    getInputHandler() {
+        return this.inputHandler;
+    }
+
+    /**
+     * Update fighter states from network synchronization
+     * @param {Object} data - Game state data from network
+     */
+    updateFighterStates(data) {
+        if (!data || !data.fighters) {
+            return;
+        }
+
+        // Update remote fighter positions and states
+        Object.keys(data.fighters).forEach(playerId => {
+            // Don't update our own fighter from network (to avoid input lag)
+            if (playerId === this.playerFighterId) {
+                return;
+            }
+
+            const fighter = this.fighters[playerId];
+            const networkState = data.fighters[playerId];
+
+            if (fighter && fighter.sprite && networkState) {
+                // Smoothly interpolate position to avoid jittery movement
+                const currentX = fighter.sprite.x;
+                const currentY = fighter.sprite.y;
+                const targetX = networkState.position.x;
+                const targetY = networkState.position.y;
+
+                // Only update if the difference is significant (avoid micro-movements)
+                const threshold = 5;
+                if (Math.abs(currentX - targetX) > threshold || Math.abs(currentY - targetY) > threshold) {
+                    fighter.sprite.x = targetX;
+                    fighter.sprite.y = targetY;
+                }
+
+                // Update health
+                if (networkState.health !== undefined) {
+                    fighter.health = networkState.health;
+                }
+            }
+        });
+    }
+
+    /**
+     * Synchronize game state with other players
+     */
+    syncGameState() {
+        if (!this.gameManager || !this.playerFighterId) {
+            return;
+        }
+
+        // Collect current fighter states
+        const fighterStates = {};
+        Object.keys(this.fighters).forEach(playerId => {
+            const fighter = this.fighters[playerId];
+            if (fighter && fighter.sprite) {
+                fighterStates[playerId] = {
+                    position: { x: fighter.sprite.x, y: fighter.sprite.y },
+                    health: fighter.health || 100,
+                    velocity: fighter.sprite.body ? {
+                        x: fighter.sprite.body.velocity.x,
+                        y: fighter.sprite.body.velocity.y
+                    } : { x: 0, y: 0 }
+                };
+            }
+        });
+
+        // Temporarily disable game state sync to debug attack messages
+        // this.gameManager.broadcastGameState({
+        //     fighters: fighterStates,
+        //     timestamp: Date.now()
+        // });
+    }
+
+    /**
+     * Set which fighter the player controls
+     * @param {string} playerId - Player ID
+     */
+    setPlayerFighter(playerId) {
+        this.playerFighterId = playerId;
+        console.log(`Player fighter set to: ${playerId}`);
+    }
+
+    /**
+     * Check if an attack hits nearby enemies
+     * @param {Object} attacker - Fighter that is attacking
+     */
+    checkAttackHit(attacker) {
+        const attackRange = 80;
+        
+        // Only the attacker's client should calculate damage to avoid duplicates
+        if (attacker.playerId !== this.playerFighterId) {
+            return;
+        }
+        
+        const attackDamage = 15 + Math.floor(Math.random() * 11); // 15-25 damage
+        
+        // Check all other fighters
+        Object.values(this.fighters).forEach(target => {
+            if (target !== attacker && target.isAlive()) {
+                const distance = Phaser.Math.Distance.Between(
+                    attacker.sprite.x, attacker.sprite.y,
+                    target.sprite.x, target.sprite.y
+                );
+                
+                if (distance <= attackRange) {
+                    // Server will handle damage calculation and broadcasting
+                    console.log(`🎯 Attack in range: ${attacker.playerId.substring(7, 13)} → ${target.playerId.substring(7, 13)}`);
+                }
+            }
+        });
+    }
+
+    /**
+     * Handle when a fighter dies
+     * @param {Object} fighter - Fighter that died
+     */
+    handleFighterDeath(fighter) {
+        console.log(`💀 ${fighter.playerId.substring(7, 13)} has been defeated!`);
+        
+        // Just handle visual effects - server will handle game over logic
+        fighter.sprite.setAlpha(0.5);
+        fighter.sprite.setTint(0x888888);
+        
+        // Don't call handleGameEnd - server handles game over detection
+    }
+
+    /**
+     * Handle game end
+     * @param {Object} winner - Winning fighter (or null for draw)
+     */
+    handleGameEnd(winner) {
+        if (winner) {
+            console.log(`🏆 ${winner.playerId.substring(7, 13)} wins!`);
+            
+            // Display winner message
+            this.add.text(400, 200, `🏆 ${winner.playerId.substring(7, 13)} WINS!`, {
+                fontSize: '32px',
+                fill: '#ffff00',
+                fontFamily: 'Arial',
+                stroke: '#000000',
+                strokeThickness: 3
+            }).setOrigin(0.5);
+        } else {
+            console.log('🤝 Draw!');
+            
+            // Display draw message
+            this.add.text(400, 200, '🤝 DRAW!', {
+                fontSize: '32px',
+                fill: '#ffffff',
+                fontFamily: 'Arial',
+                stroke: '#000000',
+                strokeThickness: 3
+            }).setOrigin(0.5);
+        }
+        
+        // Add restart instruction
+        this.add.text(400, 250, 'Press R to restart or M for menu', {
+            fontSize: '16px',
+            fill: '#cccccc',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+    }
+
+    /**
+     * Handle server-validated game over event
+     * @param {Object} data - Game over data from server
+     */
+    handleServerGameOver(data) {
+        try {
+            console.log('🎯 Game over received, processing...');
+            
+            // Extract data from the correct location
+            const gameOverData = data.data || data;
+            const { winner, defeatedPlayer, finalHealth, gameStats } = gameOverData;
+            
+            // Update fighter health values (skip visual updates to avoid errors with default fighters)
+            // NOTE: Default fighters use rectangle sprites, not full Fighter class with PNG data
+            // The updateHealthBar() function can fail if health bar objects are destroyed/invalid
+            if (finalHealth) {
+                Object.keys(finalHealth).forEach(playerId => {
+                    const fighter = this.fighters[playerId];
+                    if (fighter) {
+                        fighter.health = finalHealth[playerId];
+                        
+                        // TODO: Fix updateHealthBar() function for default fighters
+                        // For now, skip visual updates to prevent errors during game over
+                        // The health values are updated correctly, just not the visual health bars
+                    }
+                });
+            }
+        
+        // Create game over overlay
+        const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.8);
+        
+        // Display winner announcement
+        if (winner) {
+            const winnerName = winner.substring(7, 13); // Extract readable part of player ID
+            const isWinner = winner === this.gameManager?.playerId;
+            
+            this.add.text(400, 200, `🏆 ${winnerName} WINS!`, {
+                fontSize: '40px',
+                fill: isWinner ? '#00ff00' : '#ffff00',
+                fontFamily: 'Arial',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+            
+            // Add celebration effect for winner
+            if (isWinner) {
+                this.add.text(400, 250, 'VICTORY!', {
+                    fontSize: '24px',
+                    fill: '#00ff00',
+                    fontFamily: 'Arial'
+                }).setOrigin(0.5);
+            } else {
+                this.add.text(400, 250, 'DEFEAT', {
+                    fontSize: '24px',
+                    fill: '#ff6666',
+                    fontFamily: 'Arial'
+                }).setOrigin(0.5);
+            }
+        } else {
+            this.add.text(400, 200, '🤝 DRAW!', {
+                fontSize: '40px',
+                fill: '#ffffff',
+                fontFamily: 'Arial',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+        }
+        
+        // Add game duration if available
+        if (gameStats && gameStats.duration) {
+            const duration = Math.round(gameStats.duration / 1000);
+            this.add.text(400, 300, `Battle Duration: ${duration}s`, {
+                fontSize: '16px',
+                fill: '#cccccc',
+                fontFamily: 'Arial'
+            }).setOrigin(0.5);
+        }
+        
+        // Add restart instructions
+        this.add.text(400, 350, 'Press R to play again or M for menu', {
+            fontSize: '18px',
+            fill: '#ffffff',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        
+        // Disable the scene and set up restart controls
+        this.gameEnded = true;
+        this.physics.pause();
+        
+        // Set up restart/menu keys
+        const rKey = this.input.keyboard.addKey('R');
+        const mKey = this.input.keyboard.addKey('M');
+        
+        rKey.once('down', () => {
+            console.log('🔄 Restarting game...');
+            this.restartGame();
+        });
+        
+        mKey.once('down', () => {
+            console.log('🏠 Returning to menu...');
+            this.returnToMenu();
+        });
+        
+        // Disable all fighter movement and actions
+        Object.values(this.fighters).forEach(fighter => {
+            if (fighter.sprite && fighter.sprite.body) {
+                fighter.sprite.body.setVelocity(0, 0);
+                fighter.sprite.body.setImmovable(true);
+            }
+        });
+        
+        // Store game over data
+        this.gameOverData = data;
+        
+        } catch (error) {
+            console.error('❌ Error in handleServerGameOver:', error);
+            console.error('Error stack:', error.stack);
+            console.error('Data that caused error:', data);
+            // Try to create a simple overlay even if there's an error
+            try {
+                this.add.rectangle(400, 300, 800, 600, 0xff0000, 0.8);
+                this.add.text(400, 300, 'GAME OVER - ERROR OCCURRED', {
+                    fontSize: '32px',
+                    fill: '#ffffff',
+                    fontFamily: 'Arial'
+                }).setOrigin(0.5);
+            } catch (fallbackError) {
+                console.error('Even fallback overlay failed:', fallbackError);
+            }
+        }
+    }
+
+    /**
+     * Restart the game (return to drawing phase)
+     */
+    restartGame() {
+        console.log('🔄 Restarting game...');
+        
+        if (this.gameManager) {
+            // Send restart request to server
+            this.gameManager.sendGameEvent({
+                type: 'restart_game',
+                data: {}
+            });
+        }
+    }
+    
+    /**
+     * Return to main menu
+     */
+    returnToMenu() {
+        console.log('🏠 Returning to menu...');
+        
+        if (this.gameManager) {
+            // Reset game state
+            this.gameEnded = false;
+            this.gameOverData = null;
+            
+            // Switch to menu scene
+            this.gameManager.handlePhaseChange('menu');
+        }
+    }
+
+    /**
+     * Get consistent color for a player based on their ID
+     * @param {string} playerId - Player ID
+     * @returns {number} Color hex value
+     */
+    getPlayerColor(playerId) {
+        // Simple hash of player ID to get consistent color
+        let hash = 0;
+        for (let i = 0; i < playerId.length; i++) {
+            hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        // Map to predefined colors for better visibility
+        const colors = [
+            0xff0000, // Red
+            0x0000ff, // Blue  
+            0x00ff00, // Green
+            0xff00ff, // Magenta
+            0xffaa00, // Orange
+            0x00ffff  // Cyan
+        ];
+        
+        return colors[Math.abs(hash) % colors.length];
+    }
+
+    /**
+     * Clean up input handler when scene is destroyed
+     */
+    destroy() {
+        if (this.inputHandler) {
+            this.inputHandler.destroy();
+            this.inputHandler = null;
+        }
+
+        super.destroy();
+    }
+}
+
+export default CombatScene;
