@@ -147,6 +147,8 @@ Thumbs.db
 CLAUDE.md
 claude.md
 Claude.md
+.claude/
+claude/
 
 # Large media files
 *.mp4
