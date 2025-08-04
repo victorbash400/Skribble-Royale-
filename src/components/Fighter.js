@@ -12,10 +12,7 @@ class Fighter {
         this.healthBarBackground = null;
         this.textureKey = null;
         
-        // Initialize fighter with PNG data if provided
-        if (pngData) {
-            this.loadFromPNG(pngData);
-        }
+        // PNG data will be loaded explicitly via loadFromPNG() method
     }
 
     /**
@@ -25,12 +22,26 @@ class Fighter {
      */
     async loadFromPNG(pngData) {
         try {
+            console.log('🎨 Fighter.loadFromPNG called with data:', pngData ? pngData.substring(0, 50) + '...' : 'null');
+            
+            // Prevent double loading
+            if (this.sprite || this.textureKey) {
+                console.warn('⚠️ Fighter already has a sprite, skipping PNG load');
+                return true;
+            }
+            
             if (!this.scene || !pngData) {
                 throw new Error('Scene and PNG data are required');
             }
 
+            // Validate PNG data format
+            if (!pngData.startsWith('data:image/png;base64,')) {
+                throw new Error('Invalid PNG data format');
+            }
+
             // Generate unique texture key
-            this.textureKey = `fighter_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            this.textureKey = `fighter_${Date.now()}_${Math.random().toString(36).substring(2, 11)}_${performance.now()}`;
+            console.log('🔑 Generated texture key:', this.textureKey);
             
             // Create image element to load PNG data
             const img = new Image();
@@ -38,6 +49,8 @@ class Fighter {
             return new Promise((resolve, reject) => {
                 img.onload = () => {
                     try {
+                        console.log('✅ PNG image loaded successfully, dimensions:', img.width, 'x', img.height);
+                        
                         // Create canvas to process the image
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
@@ -48,25 +61,32 @@ class Fighter {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.drawImage(img, 0, 0);
                         
+                        console.log('🖼️ Canvas created and image drawn');
+                        
                         // Add texture to Phaser
                         if (this.scene.textures) {
                             this.scene.textures.addCanvas(this.textureKey, canvas);
+                            console.log('🎯 Texture added to Phaser with key:', this.textureKey);
                             
                             // Create sprite
                             this.createSprite();
+                            console.log('🚀 Fighter sprite created successfully');
                             resolve(true);
                         } else {
                             reject(new Error('Scene textures not available'));
                         }
                     } catch (error) {
+                        console.error('❌ Error in PNG onload handler:', error);
                         reject(error);
                     }
                 };
                 
-                img.onerror = () => {
+                img.onerror = (error) => {
+                    console.error('❌ Failed to load PNG image:', error);
                     reject(new Error('Failed to load PNG data'));
                 };
                 
+                console.log('🔄 Setting image src to load PNG data...');
                 img.src = pngData;
             });
         } catch (error) {
@@ -93,8 +113,16 @@ class Fighter {
             // Configure physics body
             if (this.sprite.body) {
                 this.sprite.body.setCollideWorldBounds(true);
-                this.sprite.body.setBounce(0.2);
-                this.sprite.body.setGravityY(300);
+                this.sprite.body.setBounce(0.1); // Reduce bounce to prevent floating
+                this.sprite.body.setDragX(100); // Add horizontal drag to prevent sliding
+                this.sprite.body.setMaxVelocity(300, 800); // Limit velocities
+                // Don't set individual gravity - use world gravity instead
+                
+                console.log('⚙️ Fighter physics body created:', {
+                    position: { x: this.sprite.x, y: this.sprite.y },
+                    size: { width: this.sprite.body.width, height: this.sprite.body.height },
+                    spriteSize: { width: this.sprite.width, height: this.sprite.height }
+                });
             }
         }
         
@@ -285,11 +313,9 @@ class Fighter {
             return;
         }
         
-        // Only allow jumping if fighter is on the ground (or close to it)
-        const jumpThreshold = 10; // Allow small gap for jump detection
+        // Only allow jumping if fighter is on the ground
         const isOnGround = this.sprite.body.blocked.down || 
-                          this.sprite.body.touching.down ||
-                          (this.sprite.body.velocity.y >= -jumpThreshold && this.sprite.body.velocity.y <= jumpThreshold);
+                          this.sprite.body.touching.down;
         
         if (isOnGround) {
             const jumpPower = -400; // Negative for upward movement
@@ -504,10 +530,8 @@ class Fighter {
             return false;
         }
         
-        const jumpThreshold = 10;
         const isOnGround = this.sprite.body.blocked.down || 
-                          this.sprite.body.touching.down ||
-                          (this.sprite.body.velocity.y >= -jumpThreshold && this.sprite.body.velocity.y <= jumpThreshold);
+                          this.sprite.body.touching.down;
         
         return isOnGround;
     }

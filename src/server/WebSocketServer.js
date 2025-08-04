@@ -262,6 +262,11 @@ class WebSocketServer {
 
         // Store fighter image for the player
         if (room.gameState.players[playerId]) {
+            console.log(`📸 Storing fighter image for player ${playerId}:`, {
+                hasImage: !!eventData.fighterImage,
+                imagePreview: eventData.fighterImage ? eventData.fighterImage.substring(0, 50) + '...' : 'null'
+            });
+            
             room.gameState.players[playerId].fighterImage = eventData.fighterImage;
             room.gameState.players[playerId].ready = true;
         }
@@ -280,6 +285,15 @@ class WebSocketServer {
 
         if (allPlayersReady && hasEnoughPlayers) {
             console.log(`All players ready in room ${room.code}, starting combat phase`);
+            
+            // Initialize server health tracking for combat
+            if (!room.serverHealth) {
+                room.serverHealth = {};
+            }
+            Object.keys(room.gameState.players).forEach(playerId => {
+                room.serverHealth[playerId] = 100;
+                console.log(`🏥 Combat start - initialized health for ${playerId}: 100`);
+            });
             
             // Update game phase and track combat start time
             room.gameState.phase = 'combat';
@@ -309,6 +323,11 @@ class WebSocketServer {
             console.log(`❌ Player ${playerId} not found in any room`);
             this.sendError(ws, 'Player not in a room');
             return;
+        }
+
+        // Update player position in server state
+        if (eventData.position && room.gameState.players[playerId]) {
+            room.gameState.players[playerId].position = eventData.position;
         }
 
         // Handle server-authoritative actions
@@ -402,28 +421,50 @@ class WebSocketServer {
         // Initialize server health tracking if needed
         if (!room.serverHealth) {
             room.serverHealth = {};
-            // Initialize all players in room with 100 health
-            Object.keys(room.gameState.players).forEach(playerId => {
-                room.serverHealth[playerId] = 100;
-            });
         }
+        
+        // Ensure all players in room have health tracking
+        Object.keys(room.gameState.players).forEach(playerId => {
+            if (room.serverHealth[playerId] === undefined) {
+                room.serverHealth[playerId] = 100;
+                console.log(`🏥 Initialized health for ${playerId}: 100`);
+            }
+        });
         
         const attackerPosition = attackData.position;
         const attackRange = 80;
         const attackDamage = 5 + Math.floor(Math.random() * 6); // 5-10 damage
         
-        // Find all other players in the room and damage them (simplified for debugging)
+        // Find targets within attack range
         Object.keys(room.gameState.players).forEach(targetPlayerId => {
             if (targetPlayerId === attackerPlayerId) return; // Don't attack self
             
-            // For debugging: always consider in range if they're in the same room
-            if (room.serverHealth[targetPlayerId] > 0) {
+            const targetPlayer = room.gameState.players[targetPlayerId];
+            if (!targetPlayer || room.serverHealth[targetPlayerId] <= 0) return; // Skip dead players
+            
+            // Check if target is in range using actual positions
+            let inRange = false;
+            let distance = Infinity;
+            
+            if (attackerPosition && targetPlayer.position) {
+                distance = Math.sqrt(
+                    Math.pow(attackerPosition.x - targetPlayer.position.x, 2) + 
+                    Math.pow(attackerPosition.y - targetPlayer.position.y, 2)
+                );
+                inRange = distance <= attackRange;
+                
+                console.log(`📏 Distance check: ${attackerPlayerId.substring(7, 13)} → ${targetPlayerId.substring(7, 13)} = ${distance.toFixed(1)}px (range: ${attackRange}px, inRange: ${inRange})`);
+            } else {
+                console.log(`❌ Missing position data: attacker=${!!attackerPosition}, target=${!!targetPlayer.position}`);
+            }
+            
+            if (inRange && room.serverHealth[targetPlayerId] > 0) {
                 // Apply damage on server
                 const oldHealth = room.serverHealth[targetPlayerId];
                 const newHealth = Math.max(0, oldHealth - attackDamage);
                 room.serverHealth[targetPlayerId] = newHealth;
                 
-                console.log(`💥 Server damage: ${attackerPlayerId} → ${targetPlayerId} (${attackDamage} dmg, ${oldHealth} → ${newHealth} hp)`);
+                console.log(`💥 Server damage: ${attackerPlayerId.substring(7, 13)} → ${targetPlayerId.substring(7, 13)} (${attackDamage} dmg, ${oldHealth} → ${newHealth} hp, distance: ${distance.toFixed(1)}px)`);
                 
                 // Broadcast authoritative damage event
                 this.roomManager.broadcastToRoom(room.code, {
@@ -442,6 +483,8 @@ class WebSocketServer {
                 if (newHealth <= 0) {
                     this.checkGameOver(room, targetPlayerId);
                 }
+            } else if (!inRange && distance !== Infinity) {
+                console.log(`🚫 Attack missed: ${attackerPlayerId.substring(7, 13)} → ${targetPlayerId.substring(7, 13)} (distance: ${distance.toFixed(1)}px > range: ${attackRange}px)`);
             }
         });
         
@@ -525,16 +568,26 @@ class WebSocketServer {
             room.serverHealth = {};
         }
         
-        // Check ONLY players who are actually being tracked in serverHealth
-        const alivePlayers = Object.keys(room.serverHealth).filter(playerId => {
+        // Ensure all active players are tracked in serverHealth
+        Object.keys(room.gameState.players).forEach(playerId => {
+            if (room.serverHealth[playerId] === undefined) {
+                room.serverHealth[playerId] = 100;
+                console.log(`🏥 Late health initialization for ${playerId}: 100`);
+            }
+        });
+        
+        // Check all players who are in the game
+        const alivePlayers = Object.keys(room.gameState.players).filter(playerId => {
             const health = room.serverHealth[playerId];
             return health > 0;
         });
 
+        console.log(`🔍 Game over check: ${alivePlayers.length} alive players out of ${Object.keys(room.gameState.players).length} total`);
+
         if (alivePlayers.length <= 1) {
             const winner = alivePlayers[0] || null;
             
-            console.log(`🏆 Game over in room ${room.code}. Winner: ${winner || 'Draw'}`);
+            console.log(`🏆 Game over in room ${room.code}. Winner: ${winner ? winner.substring(7, 13) : 'Draw'}`);
             
             // Update room state
             room.gameState.phase = 'results';
@@ -550,7 +603,7 @@ class WebSocketServer {
                     finalHealth: room.serverHealth,
                     gameStats: {
                         roomCode: room.code,
-                        duration: Date.now() - room.combatStartTime,
+                        duration: room.combatStartTime ? Date.now() - room.combatStartTime : 0,
                         playerCount: Object.keys(room.gameState.players).length
                     }
                 },
@@ -625,14 +678,23 @@ class WebSocketServer {
         room.gameState.winner = null;
         room.combatStartTime = null;
         
-        // Reset server health tracking
+        // Reset server health tracking completely
         room.serverHealth = {};
+        
+        // Clear any other server state
+        if (room.serverState) {
+            room.serverState = {};
+        }
+        if (room.actionHistory) {
+            room.actionHistory = [];
+        }
         
         // Reset all players to not ready
         Object.keys(room.gameState.players).forEach(playerId => {
             if (room.gameState.players[playerId]) {
                 room.gameState.players[playerId].ready = false;
                 room.gameState.players[playerId].fighterImage = null;
+                room.gameState.players[playerId].health = 100; // Reset client health too
             }
         });
         

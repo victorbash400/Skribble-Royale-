@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNG to Sprite Conversion Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        .test-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .drawing-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .canvas-container {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #333;
+            cursor: crosshair;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .primary { background: #4CAF50; color: white; }
+        .secondary { background: #f44336; color: white; }
+        .info { background: #2196F3; color: white; }
+        #gameContainer {
+            border: 2px solid #333;
+            margin-top: 20px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎨 PNG to Sprite Conversion Test</h1>
+        <p>Draw something on the canvas below, then test if it converts properly to a Phaser sprite.</p>
+        
+        <div class="drawing-section">
+            <div class="canvas-container">
+                <h3>Drawing Canvas</h3>
+                <canvas id="drawingCanvas" width="400" height="300"></canvas>
+                <div class="controls">
+                    <button class="primary" onclick="clearCanvas()">Clear</button>
+                    <button class="info" onclick="testConversion()">Test PNG → Sprite</button>
+                    <button class="secondary" onclick="drawTestFighter()">Draw Test Fighter</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="status"></div>
+        
+        <h3>Phaser Game (Sprite Test)</h3>
+        <div id="gameContainer"></div>
+    </div>
+
+    <script type="module">
+        // Import Fighter class
+        import Fighter from './src/components/Fighter.js';
+        
+        // Drawing canvas setup
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        // Set up transparent background
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#000';
+
+        // Drawing event listeners
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            lastX = e.clientX - rect.left;
+            lastY = e.clientY - rect.top;
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            lastX = x;
+            lastY = y;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+            ctx.beginPath();
+        });
+
+        // Global functions
+        window.clearCanvas = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            showStatus('Canvas cleared', 'success');
+        };
+
+        window.drawTestFighter = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw a simple stick figure fighter
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#000';
+            
+            // Head
+            ctx.beginPath();
+            ctx.arc(200, 80, 25, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Body
+            ctx.beginPath();
+            ctx.moveTo(200, 105);
+            ctx.lineTo(200, 200);
+            ctx.stroke();
+            
+            // Arms
+            ctx.beginPath();
+            ctx.moveTo(200, 130);
+            ctx.lineTo(160, 160);
+            ctx.moveTo(200, 130);
+            ctx.lineTo(240, 160);
+            ctx.stroke();
+            
+            // Legs
+            ctx.beginPath();
+            ctx.moveTo(200, 200);
+            ctx.lineTo(170, 250);
+            ctx.moveTo(200, 200);
+            ctx.lineTo(230, 250);
+            ctx.stroke();
+            
+            // Face
+            ctx.fillStyle = '#000';
+            ctx.fillRect(192, 72, 4, 4); // Left eye
+            ctx.fillRect(204, 72, 4, 4); // Right eye
+            ctx.beginPath();
+            ctx.arc(200, 88, 8, 0, Math.PI);
+            ctx.stroke(); // Smile
+            
+            showStatus('Test fighter drawn!', 'success');
+        };
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        // Phaser game configuration
+        let game;
+        let testScene;
+
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 400,
+            parent: 'gameContainer',
+            backgroundColor: '#f8f8f8',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 300 },
+                    debug: false
+                }
+            },
+            scene: {
+                preload: function() {
+                    // No assets to preload
+                },
+                create: function() {
+                    testScene = this;
+                    
+                    // Create ground
+                    const ground = this.add.rectangle(400, 350, 800, 50, 0x8b4513);
+                    this.physics.add.existing(ground, true);
+                    
+                    // Instructions
+                    this.add.text(400, 50, 'PNG Sprite Test Area', {
+                        fontSize: '24px',
+                        fill: '#333',
+                        fontFamily: 'Arial'
+                    }).setOrigin(0.5);
+                    
+                    showStatus('Phaser scene ready. Draw something and click "Test PNG → Sprite"', 'success');
+                }
+            }
+        };
+
+        // Initialize Phaser game
+        game = new Phaser.Game(config);
+
+        // Test conversion function
+        window.testConversion = async () => {
+            try {
+                showStatus('Converting drawing to PNG...', 'warning');
+                
+                // Get PNG data from canvas
+                const pngData = canvas.toDataURL('image/png');
+                
+                if (!pngData || pngData === 'data:,') {
+                    throw new Error('No drawing found on canvas');
+                }
+                
+                showStatus(`PNG data generated (${pngData.length} bytes). Creating Phaser sprite...`, 'warning');
+                
+                // Clear any existing sprites
+                if (testScene) {
+                    testScene.children.getChildren().forEach(child => {
+                        if (child.texture && child.texture.key.startsWith('fighter_')) {
+                            child.destroy();
+                        }
+                    });
+                }
+                
+                // Create fighter with PNG data
+                const fighter = new Fighter(testScene, 200, 300);
+                
+                // Test the conversion
+                const success = await fighter.loadFromPNG(pngData);
+                
+                if (success) {
+                    showStatus('✅ SUCCESS! PNG drawing converted to Phaser sprite successfully!', 'success');
+                } else {
+                    throw new Error('Fighter.loadFromPNG() returned false');
+                }
+                
+            } catch (error) {
+                console.error('Conversion test failed:', error);
+                showStatus(`❌ FAILED: ${error.message}`, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

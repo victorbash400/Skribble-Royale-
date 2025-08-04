@@ -95,7 +95,10 @@
   - Write unit tests for Fighter initialization and health management
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [x] 8. Build combat scene with fighter positioning
+- [ ] 8. Build combat scene with fighter positioning
+
+
+
 
 
 

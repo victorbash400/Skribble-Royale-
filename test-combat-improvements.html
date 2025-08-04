@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combat Improvements Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+</head>
+<body>
+    <div id="game-container"></div>
+    <div id="instructions">
+        <h3>Combat Test Instructions:</h3>
+        <ul>
+            <li>Open two browser windows/tabs with this page</li>
+            <li>Create a room in one, join with the same code in the other</li>
+            <li>Draw fighters and start combat</li>
+            <li>Test: Movement (WASD), Jump (Space), Attack (X)</li>
+            <li>Look for: Attack range circles, proper physics, reduced lag</li>
+        </ul>
+    </div>
+
+    <script type="module">
+        import GameManager from './src/components/GameManager.js';
+        import MenuScene from './src/scenes/MenuScene.js';
+        import DrawingScene from './src/scenes/DrawingScene.js';
+        import CombatScene from './src/scenes/CombatScene.js';
+        import ResultsScene from './src/scenes/ResultsScene.js';
+
+        // Initialize Phaser game
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game-container',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 300 },
+                    debug: false
+                }
+            },
+            scene: [MenuScene, DrawingScene, CombatScene, ResultsScene]
+        };
+
+        const game = new Phaser.Game(config);
+
+        // Initialize GameManager
+        const gameManager = new GameManager();
+        gameManager.game = game;
+        window.gameManager = gameManager;
+
+        // Start the game
+        gameManager.initializeGame();
+
+        console.log('Combat improvements test initialized');
+    </script>
+</body>
+</html>

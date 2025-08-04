@@ -18,12 +18,19 @@ export function canvasToTransparentPNG(canvas) {
 
 export function validatePNGData(pngData) {
     if (!pngData || typeof pngData !== 'string') {
+        console.warn('PNG data validation failed: invalid data type', typeof pngData);
         return false;
     }
     
     // Check if it's a valid data URL with PNG format
     const pngPattern = /^data:image\/png;base64,/;
-    return pngPattern.test(pngData);
+    const isValid = pngPattern.test(pngData);
+    
+    if (!isValid) {
+        console.warn('PNG data validation failed: invalid format', pngData.substring(0, 50) + '...');
+    }
+    
+    return isValid;
 }
 
 export function createPhaserTexture(scene, pngData, key) {

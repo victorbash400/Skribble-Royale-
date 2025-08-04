@@ -53,6 +53,15 @@ class RoomManager {
             ws: ws // Store WebSocket connection for broadcasting
         };
         
+        // Initialize server health tracking if room is in combat phase
+        if (room.gameState.phase === 'combat') {
+            if (!room.serverHealth) {
+                room.serverHealth = {};
+            }
+            room.serverHealth[playerId] = 100;
+            console.log(`🏥 Initialized health for joining player ${playerId}: 100`);
+        }
+        
         this.playerRooms.set(playerId, roomCode);
         room.lastActivity = new Date();
         

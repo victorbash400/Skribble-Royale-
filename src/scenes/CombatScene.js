@@ -45,8 +45,10 @@ class CombatScene extends Phaser.Scene {
         // Setup UI
         this.setupUI();
 
-        // Load fighters from game state
-        this.loadFighters();
+        // Load fighters from game state (with small delay to ensure game state is synchronized)
+        this.time.delayedCall(100, () => {
+            this.loadFighters();
+        });
     }
 
     /**
@@ -71,12 +73,16 @@ class CombatScene extends Phaser.Scene {
     setupPhysicsWorld() {
         // Enable physics
         this.physics.world.setBounds(0, 0, this.arena.width, this.arena.height);
-        this.physics.world.setBoundsCollision(true, true, true, false);
+        this.physics.world.setBoundsCollision(true, true, true, true); // Enable bottom collision
 
         // Set gravity
         this.physics.world.gravity.y = 300;
 
-        console.log('Physics world configured');
+        console.log('Physics world configured:', {
+            bounds: { width: this.arena.width, height: this.arena.height },
+            groundY: this.arena.groundY,
+            gravity: this.physics.world.gravity.y
+        });
     }
 
     /**
@@ -86,10 +92,10 @@ class CombatScene extends Phaser.Scene {
         // Paper-like background that fills the screen
         this.add.rectangle(this.cameras.main.centerX, this.cameras.main.centerY, this.arena.width, this.arena.height, 0xf8f8f8);
 
-        // Hand-drawn style ground
-        this.ground = this.add.rectangle(this.cameras.main.centerX, this.arena.groundY, this.arena.width, 15, 0x8b4513);
+        // Hand-drawn style ground (visual only - no physics collision)
+        this.ground = this.add.rectangle(this.cameras.main.centerX, this.arena.groundY, this.arena.width, 40, 0x8b4513);
         this.ground.setStrokeStyle(2, 0x654321);
-        this.physics.add.existing(this.ground, true); // Static body
+        // Don't add physics to ground - let world bounds handle collision
 
         // Create side walls (invisible collision boundaries)
         const leftWall = this.add.rectangle(0, this.cameras.main.centerY, 20, this.arena.height, 0x000000, 0);
@@ -192,13 +198,30 @@ class CombatScene extends Phaser.Scene {
     async loadFighters() {
         const gameState = this.gameManager ? this.gameManager.getGameState() : null;
 
+        console.log('🎮 loadFighters called, gameState:', gameState);
+
         if (!gameState || !gameState.players) {
-            console.warn('No game state or players available');
+            console.warn('❌ No game state or players available:', {
+                hasGameManager: !!this.gameManager,
+                hasGameState: !!gameState,
+                hasPlayers: gameState ? !!gameState.players : false
+            });
             return;
         }
 
         const players = Object.values(gameState.players);
         console.log('Loading fighters for players:', players);
+        
+        // Debug: Check each player's data structure
+        players.forEach((player, index) => {
+            console.log(`Player ${index}:`, {
+                id: player.id,
+                ready: player.ready,
+                hasFighterImage: !!player.fighterImage,
+                fighterImagePreview: player.fighterImage ? player.fighterImage.substring(0, 50) + '...' : 'null',
+                hasPngData: !!player.pngData
+            });
+        });
 
         // Clear existing fighters
         this.clearFighters();
@@ -217,8 +240,16 @@ class CombatScene extends Phaser.Scene {
             }
         }
 
-        this.fightersLoaded = true;
+        this.fightersLoaded = fighterIndex > 0; // Only mark as loaded if we actually loaded fighters
         this.updateCombatStatus();
+        
+        console.log(`✅ Successfully loaded ${fighterIndex} fighters`);
+        
+        // If no fighters were loaded, set up a retry mechanism
+        if (fighterIndex === 0) {
+            console.log('⚠️ No fighters loaded, setting up retry mechanism');
+            this.setupFighterLoadRetry();
+        }
     }
 
     /**
@@ -227,22 +258,32 @@ class CombatScene extends Phaser.Scene {
      * @param {number} index - Fighter index (0 = left, 1 = right)
      */
     async spawnFighter(player, index) {
-        if (!player || !player.pngData) {
-            console.warn('Player missing PNG data:', player);
+        // Check for PNG data in either fighterImage or pngData property
+        const pngData = player.fighterImage || player.pngData;
+        
+        console.log(`🎭 Spawning fighter for player ${player.id}:`, {
+            hasFighterImage: !!player.fighterImage,
+            hasPngData: !!player.pngData,
+            finalPngData: !!pngData,
+            pngDataPreview: pngData ? pngData.substring(0, 50) + '...' : 'null'
+        });
+        
+        if (!player || !pngData) {
+            console.warn('❌ Player missing PNG data:', player);
             // Create a default fighter for testing
             return this.spawnDefaultFighter(player, index);
         }
 
         // Determine spawn position
         const spawnX = index === 0 ? this.arena.leftSpawnX : this.arena.rightSpawnX;
-        const spawnY = this.arena.groundY - 50; // Spawn above ground
+        const spawnY = this.arena.groundY - 60; // Spawn closer to ground
 
         // Create fighter
-        const fighter = new Fighter(this, spawnX, spawnY, player.pngData);
+        const fighter = new Fighter(this, spawnX, spawnY, pngData);
 
         try {
             // Load fighter from PNG data
-            const success = await fighter.loadFromPNG(player.pngData);
+            const success = await fighter.loadFromPNG(pngData);
 
             if (success) {
                 // Store fighter reference
@@ -270,7 +311,7 @@ class CombatScene extends Phaser.Scene {
      */
     spawnDefaultFighter(player, index) {
         const spawnX = index === 0 ? this.arena.leftSpawnX : this.arena.rightSpawnX;
-        const spawnY = this.arena.groundY - 50;
+        const spawnY = this.arena.groundY - 50; // Spawn closer to ground
 
         // Create a simple colored rectangle as default fighter
         // Use consistent color based on player ID hash, not index
@@ -280,8 +321,9 @@ class CombatScene extends Phaser.Scene {
 
         if (defaultSprite.body) {
             defaultSprite.body.setCollideWorldBounds(true);
-            defaultSprite.body.setBounce(0.2);
-            defaultSprite.body.setGravityY(300);
+            defaultSprite.body.setBounce(0.1);
+            defaultSprite.body.setDragX(100); // Add drag to prevent sliding
+            defaultSprite.body.setMaxVelocity(300, 800); // Limit velocities like Fighter class
         }
 
         // Create health bar
@@ -313,8 +355,13 @@ class CombatScene extends Phaser.Scene {
                 }
             },
             jump: () => {
-                if (defaultSprite.body && (defaultSprite.body.blocked.down || defaultSprite.body.touching.down)) {
+                // Use same jump logic as Fighter class
+                const isOnGround = defaultSprite.body && (defaultSprite.body.blocked.down || defaultSprite.body.touching.down);
+                if (isOnGround) {
                     defaultSprite.body.setVelocityY(-400);
+                    console.log(`Default fighter jumping from y=${defaultSprite.y}`);
+                } else {
+                    console.log(`Default fighter cannot jump - not on ground (y=${defaultSprite.y})`);
                 }
             },
             attack: () => {
@@ -324,11 +371,22 @@ class CombatScene extends Phaser.Scene {
                     defaultSprite.setFillStyle(playerColor);
                 });
                 
+                // Show attack range indicator
+                const attackRange = 80;
+                const rangeCircle = this.add.circle(defaultSprite.x, defaultSprite.y, attackRange, 0xff0000, 0.2);
+                rangeCircle.setStrokeStyle(2, 0xff0000);
+                this.time.delayedCall(300, () => {
+                    rangeCircle.destroy();
+                });
+                
                 // Don't calculate damage locally - let server handle it
                 // Just show attack animation
             },
             canMove: () => fighter.health > 0,
-            canJump: () => fighter.health > 0 && defaultSprite.body && (defaultSprite.body.blocked.down || defaultSprite.body.touching.down),
+            canJump: () => {
+                const isOnGround = fighter.health > 0 && defaultSprite.body && (defaultSprite.body.blocked.down || defaultSprite.body.touching.down);
+                return isOnGround;
+            },
             canAttack: () => fighter.health > 0,
             updateHealthBar: () => {
                 if (healthBar && healthBarBg && nameLabel) {
@@ -404,8 +462,8 @@ class CombatScene extends Phaser.Scene {
     setupFighterCollisions(fighter) {
         if (!fighter.sprite) return;
 
-        // Collision with ground
-        this.physics.add.collider(fighter.sprite, this.ground);
+        // No ground collision needed - world bounds handle the floor
+        console.log('🔗 Setting up fighter collisions at:', fighter.sprite.x, fighter.sprite.y);
 
         // Collision with walls
         this.walls.forEach(wall => {
@@ -470,6 +528,12 @@ class CombatScene extends Phaser.Scene {
             case 'game_state_update':
                 // Update fighter states from network
                 this.updateFighterStates(data);
+                
+                // If we don't have fighters loaded yet, try loading them now
+                if (!this.fightersLoaded) {
+                    console.log('🔄 Attempting to load fighters from game state update');
+                    this.loadFighters();
+                }
                 break;
             case 'player_joined':
                 // New player joined, reload fighters
@@ -488,6 +552,12 @@ class CombatScene extends Phaser.Scene {
                     this.updateCombatStatus();
                 }
                 break;
+            case 'fighter_submit':
+                // When a fighter is submitted, try reloading fighters
+                console.log('🎨 Fighter submitted, reloading fighters');
+                this.loadFighters();
+                break;
+                
             case 'player_action':
                 // Handle remote player actions
                 this.handleRemotePlayerAction(data);
@@ -496,6 +566,16 @@ class CombatScene extends Phaser.Scene {
                 // Handle server-authoritative damage
                 this.handleServerDamage(data);
                 break;
+            case 'phase_change':
+                // When phase changes to combat, ensure fighters are loaded
+                if (data.phase === 'combat' || (data.data && data.data.phase === 'combat')) {
+                    console.log('🎯 Combat phase started, ensuring fighters are loaded');
+                    if (!this.fightersLoaded) {
+                        this.loadFighters();
+                    }
+                }
+                break;
+                
             case 'game_over':
                 console.log('🎯 CombatScene handleGameManagerEvent - game_over received:', data);
                 // Handle server-validated game over
@@ -603,14 +683,33 @@ class CombatScene extends Phaser.Scene {
             if (fighter.updateHealthBar) {
                 fighter.updateHealthBar();
             }
+            
+            // Smooth interpolation for remote fighters
+            if (fighter.playerId !== this.playerFighterId && fighter.targetPosition && fighter.sprite) {
+                const currentX = fighter.sprite.x;
+                const currentY = fighter.sprite.y;
+                const targetX = fighter.targetPosition.x;
+                const targetY = fighter.targetPosition.y;
+                
+                // Interpolate towards target position (0.2 = 20% each frame)
+                const lerpFactor = 0.2;
+                fighter.sprite.x = currentX + (targetX - currentX) * lerpFactor;
+                fighter.sprite.y = currentY + (targetY - currentY) * lerpFactor;
+            }
+            
+            // Check if fighter has fallen off the map and respawn if needed
+            if (fighter.sprite && fighter.sprite.y > this.arena.height + 100) {
+                console.log('⚠️ Fighter fell off map, respawning...');
+                this.respawnFighter(fighter);
+            }
         });
 
-        // Periodic game state synchronization (every 200ms to avoid spam)
+        // Periodic game state synchronization (every 1000ms for backup sync)
         if (!this.lastSyncTime) {
             this.lastSyncTime = 0;
         }
 
-        if (time - this.lastSyncTime > 200) {
+        if (time - this.lastSyncTime > 1000) {
             this.syncGameState();
             this.lastSyncTime = time;
         }
@@ -634,19 +733,22 @@ class CombatScene extends Phaser.Scene {
         if (movementDirection !== 0 && playerFighter.canMove()) {
             playerFighter.move(movementDirection);
 
-            // Send movement to other players
-            if (this.gameManager) {
-                this.gameManager.sendPlayerAction({
-                    action: 'move',
-                    direction: movementDirection,
-                    position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
-                });
+            // Send movement updates at 30 FPS for smooth multiplayer
+            if (!this.lastMovementSent || Date.now() - this.lastMovementSent > 33) {
+                if (this.gameManager) {
+                    this.gameManager.sendPlayerAction({
+                        action: 'move',
+                        direction: movementDirection,
+                        position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
+                    });
+                }
+                this.lastMovementSent = Date.now();
             }
-        } else if (movementDirection === 0) {
+        } else if (movementDirection === 0 && this.wasMoving) {
             // Stop movement when no keys are pressed
             playerFighter.move(0);
 
-            // Send stop movement to other players
+            // Send stop movement to other players (only once when stopping)
             if (this.gameManager) {
                 this.gameManager.sendPlayerAction({
                     action: 'move',
@@ -655,6 +757,9 @@ class CombatScene extends Phaser.Scene {
                 });
             }
         }
+        
+        // Track if we were moving for stop detection
+        this.wasMoving = movementDirection !== 0;
 
         // Handle jump input
         if (this.inputHandler.isJumpPressed() && playerFighter.canJump()) {
@@ -671,14 +776,19 @@ class CombatScene extends Phaser.Scene {
 
         // Handle attack input (with cooldown)
         if (this.inputHandler.isAttackPressed() && playerFighter.canAttack()) {
-            playerFighter.attack();
+            // Check attack cooldown (500ms between attacks)
+            const now = Date.now();
+            if (!this.lastAttackTime || now - this.lastAttackTime > 500) {
+                playerFighter.attack();
+                this.lastAttackTime = now;
 
-            // Send attack to server for processing
-            if (this.gameManager) {
-                this.gameManager.sendPlayerAction({
-                    action: 'attack',
-                    position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
-                });
+                // Send attack to server for processing
+                if (this.gameManager) {
+                    this.gameManager.sendPlayerAction({
+                        action: 'attack',
+                        position: playerFighter.sprite ? { x: playerFighter.sprite.x, y: playerFighter.sprite.y } : null
+                    });
+                }
             }
         }
     }
@@ -717,10 +827,15 @@ class CombatScene extends Phaser.Scene {
                 if (remoteFighter.move) {
                     remoteFighter.move(direction);
                 }
-                // Update position if provided for better sync
+                // Smooth interpolation to server position
                 if (position && remoteFighter.sprite) {
-                    remoteFighter.sprite.x = position.x;
-                    remoteFighter.sprite.y = position.y;
+                    // Store target position for interpolation
+                    if (!remoteFighter.targetPosition) {
+                        remoteFighter.targetPosition = { x: position.x, y: position.y };
+                    } else {
+                        remoteFighter.targetPosition.x = position.x;
+                        remoteFighter.targetPosition.y = position.y;
+                    }
                 }
                 break;
 
@@ -738,6 +853,52 @@ class CombatScene extends Phaser.Scene {
                 console.log(`💥 Remote player attacked!`);
                 break;
         }
+    }
+
+    /**
+     * Set up retry mechanism for loading fighters
+     */
+    setupFighterLoadRetry() {
+        // Retry loading fighters every 2 seconds up to 5 times
+        let retryCount = 0;
+        const maxRetries = 5;
+        
+        const retryInterval = setInterval(() => {
+            retryCount++;
+            console.log(`🔄 Retry ${retryCount}/${maxRetries}: Attempting to load fighters...`);
+            
+            this.loadFighters().then(() => {
+                if (this.fightersLoaded || retryCount >= maxRetries) {
+                    clearInterval(retryInterval);
+                    if (!this.fightersLoaded) {
+                        console.log('❌ Failed to load fighters after all retries');
+                    }
+                }
+            });
+        }, 2000);
+    }
+
+    /**
+     * Respawn a fighter that has fallen off the map
+     * @param {Object} fighter - Fighter to respawn
+     */
+    respawnFighter(fighter) {
+        if (!fighter || !fighter.sprite) return;
+        
+        // Reset position to spawn location
+        const playerId = fighter.playerId;
+        const playerIndex = Object.keys(this.fighters).indexOf(playerId);
+        const spawnX = playerIndex === 0 ? this.arena.leftSpawnX : this.arena.rightSpawnX;
+        const spawnY = this.arena.groundY - 200;
+        
+        fighter.sprite.setPosition(spawnX, spawnY);
+        
+        // Reset velocity
+        if (fighter.sprite.body) {
+            fighter.sprite.body.setVelocity(0, 0);
+        }
+        
+        console.log(`Fighter ${playerId} respawned at (${spawnX}, ${spawnY})`);
     }
 
     /**
@@ -813,11 +974,11 @@ class CombatScene extends Phaser.Scene {
             }
         });
 
-        // Temporarily disable game state sync to debug attack messages
-        // this.gameManager.broadcastGameState({
-        //     fighters: fighterStates,
-        //     timestamp: Date.now()
-        // });
+        // Broadcast game state to keep positions synchronized
+        this.gameManager.broadcastGameState({
+            fighters: fighterStates,
+            timestamp: Date.now()
+        });
     }
 
     /**
